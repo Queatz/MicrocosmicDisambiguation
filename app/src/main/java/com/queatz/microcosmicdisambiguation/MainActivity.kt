@@ -33,6 +33,7 @@ import com.queatz.microcosmicdisambiguation.audio.SpeakerStatus
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.TtsMode
 import com.queatz.microcosmicdisambiguation.ui.HomeScreen
+import com.queatz.microcosmicdisambiguation.ui.MissionScreen
 import com.queatz.microcosmicdisambiguation.ui.SettingsScreen
 import com.queatz.microcosmicdisambiguation.ui.StudyScreen
 import com.queatz.microcosmicdisambiguation.ui.theme.MicrocosmicDisambiguationTheme
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
 private const val ROUTE_HOME = "home"
 private const val ROUTE_STUDY = "study"
+private const val ROUTE_MISSION = "mission"
 private const val ROUTE_SETTINGS = "settings"
 private const val ARG_ID = "id"
 
@@ -164,8 +166,27 @@ fun MicrocosmicDisambiguationApp() {
                         guide = guide,
                         speaker = speaker,
                         onClose = { navController.popBackStack() },
+                        onStartMissions = { navController.navigate("$ROUTE_MISSION/$id") },
                     )
                 }
+            }
+            composable(
+                route = "$ROUTE_MISSION/{$ARG_ID}",
+                arguments = listOf(navArgument(ARG_ID) { type = NavType.LongType }),
+            ) { entry ->
+                val id = entry.arguments?.getLong(ARG_ID) ?: 0L
+                val missionState by viewModel.missionState.collectAsState()
+                LaunchedEffect(id) { viewModel.loadMissions(id) }
+                MissionScreen(
+                    title = remember(id) { viewModel.title(id) },
+                    state = missionState,
+                    speaker = speaker,
+                    onClose = { navController.popBackStack() },
+                    onRetry = {
+                        viewModel.resetMissions()
+                        viewModel.loadMissions(id)
+                    },
+                )
             }
         }
     }

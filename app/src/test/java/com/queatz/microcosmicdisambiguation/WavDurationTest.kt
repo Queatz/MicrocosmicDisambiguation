@@ -82,4 +82,50 @@ class WavDurationTest {
     fun wavDurationMs_returnsZeroForNonWav() {
         assertEquals(0L, QwenSpeaker.wavDurationMs("not a wav file at all!!".toByteArray()))
     }
+
+    @Test
+    fun prependSilence_addsLeadingFramesAndKeepsOriginalAudio() {
+        // 24kHz mono 16-bit (byteRate 48000), bogus stream sizes like the real Qwen files.
+        val original = wav(
+            sampleRate = 24000,
+            channels = 1,
+            bitsPerSample = 16,
+            dataBytes = 48000, // 1.0s of audio
+            declaredDataSize = 0x7FFFFF9BL,
+        )
+        // Fill the audio data with a recognisable non-zero marker so we can find it after padding.
+        for (o in 44 until original.size) original[o] = 0x55
+        val padded = QwenSpeaker.prependSilence(original, 250L)
+        // 250ms at 48000 bytes/s = 12000 silent bytes inserted before the original data.
+        assertEquals(original.size + 12000, padded.size)
+        // The inserted region must be silence...
+        for (o in 44 until 44 + 12000) assertEquals(0.toByte(), padded[o])
+        // ...followed by the untouched original audio marker.
+        assertEquals(0x55.toByte(), padded[44 + 12000])
+        // Duration grows by exactly the inserted silence: 1000ms + 250ms.
+        assertEquals(1250L, QwenSpeaker.wavDurationMs(padded))
+    }
+
+    @Test
+    fun prependSilence_updatesDeclaredSizesWhenValid() {
+        val original = wav(
+            sampleRate = 24000,
+            channels = 1,
+            bitsPerSample = 16,
+            dataBytes = 48000,
+            declaredDataSize = 48000L,
+        )
+        val padded = QwenSpeaker.prependSilence(original, 250L)
+        // Declared data size is real here, so it should be bumped by the 12000 silent bytes,
+        // keeping the header well-formed and the duration correct.
+        assertEquals(1250L, QwenSpeaker.wavDurationMs(padded))
+    }
+
+    @Test
+    fun prependSilence_returnsInputForNonWavOrNonPositiveMs() {
+        val notWav = "not a wav file at all!!".toByteArray()
+        assertEquals(notWav, QwenSpeaker.prependSilence(notWav, 250L))
+        val original = wav(24000, 1, 16, 48000, 48000L)
+        assertEquals(original, QwenSpeaker.prependSilence(original, 0L))
+    }
 }

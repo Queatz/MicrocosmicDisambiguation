@@ -157,12 +157,18 @@ class QwenSpeaker(
         onRange: (start: Int, end: Int) -> Unit,
     ) {
         if (speakable.isEmpty() || durationMs <= 0) return
+        // The clip starts with LEAD_SILENCE_MS of padding (see prependSilence), so the spoken
+        // characters only occupy the remainder. Map elapsed time onto that speech window so the
+        // highlight doesn't run ahead of the audio during the silent lead-in.
+        val leadMs = LEAD_SILENCE_MS.coerceIn(0, durationMs)
+        val speechDurationMs = (durationMs - leadMs).coerceAtLeast(1L)
         rangeJob = scope.launch {
             val startTime = System.currentTimeMillis()
             var lastIndex = -1
             while (isActive) {
                 val elapsed = System.currentTimeMillis() - startTime
-                val index = (elapsed * speakable.size / durationMs)
+                val elapsedSpeech = (elapsed - leadMs).coerceAtLeast(0L)
+                val index = (elapsedSpeech * speakable.size / speechDurationMs)
                     .toInt()
                     .coerceIn(0, speakable.size - 1)
                 if (index != lastIndex) {
@@ -180,8 +186,11 @@ class QwenSpeaker(
     private suspend fun audioFor(text: String): File {
         audioCache[text]?.let { if (it.exists()) return it }
         val bytes = qwen.synthesizeSpeech(text)
+        // Prepend a short lead-in of silence so the first few milliseconds of speech are never
+        // clipped before playback ramps up.
+        val padded = prependSilence(bytes, LEAD_SILENCE_MS)
         val file = File(appContext.cacheDir, "qwen_tts_${text.hashCode()}.wav")
-        file.writeBytes(bytes)
+        file.writeBytes(padded)
         audioCache[text] = file
         return file
     }
@@ -273,6 +282,83 @@ class QwenSpeaker(
 
         /** How often (ms) the highlight is advanced against the elapsed-time clock (~30fps). */
         private const val POLL_INTERVAL_MS = 33L
+
+        /**
+         * Silence (in ms) prepended to every generated clip. The Qwen WAVs are stream-generated and
+         * occasionally have their first few milliseconds clipped by the time playback actually
+         * starts, so the opening sound is lost. Prepending a short run of silent PCM frames gives
+         * the player a small lead-in, guaranteeing the real audio is heard in full.
+         */
+        internal const val LEAD_SILENCE_MS = 200L
+
+        /**
+         * Returns a copy of the PCM WAV [bytes] with [silenceMs] of silent frames inserted at the
+         * start of the `data` chunk, leaving the original audio otherwise untouched. The declared
+         * RIFF/`data` sizes are bumped by the inserted amount when they look valid, and left as-is
+         * when they're the bogus stream placeholders. Returns the input unchanged if it isn't a
+         * parseable RIFF/WAVE container or [silenceMs] is non-positive.
+         */
+        internal fun prependSilence(bytes: ByteArray, silenceMs: Long): ByteArray {
+            if (silenceMs <= 0 || bytes.size < 44) return bytes
+            fun u16(o: Int): Int =
+                (bytes[o].toInt() and 0xFF) or ((bytes[o + 1].toInt() and 0xFF) shl 8)
+            fun u32(o: Int): Long =
+                (bytes[o].toLong() and 0xFF) or
+                    ((bytes[o + 1].toLong() and 0xFF) shl 8) or
+                    ((bytes[o + 2].toLong() and 0xFF) shl 16) or
+                    ((bytes[o + 3].toLong() and 0xFF) shl 24)
+            if (String(bytes, 0, 4, Charsets.US_ASCII) != "RIFF" ||
+                String(bytes, 8, 4, Charsets.US_ASCII) != "WAVE"
+            ) {
+                return bytes
+            }
+            var byteRate = 0L
+            var blockAlign = 1
+            var dataHeaderStart = -1
+            var declaredDataSize = 0L
+            var i = 12
+            while (i + 8 <= bytes.size) {
+                val id = String(bytes, i, 4, Charsets.US_ASCII)
+                val size = u32(i + 4)
+                if (id == "fmt ") {
+                    // fmt data layout: audioFormat(2) channels(2) sampleRate(4) byteRate(4)
+                    // blockAlign(2) bitsPerSample(2)
+                    byteRate = u32(i + 8 + 8)
+                    blockAlign = u16(i + 8 + 12).coerceAtLeast(1)
+                }
+                if (id == "data") {
+                    dataHeaderStart = i
+                    declaredDataSize = size
+                    break
+                }
+                i += 8 + size.toInt() + (size.toInt() and 1)
+            }
+            if (byteRate <= 0 || dataHeaderStart < 0) return bytes
+            // Align the silence to whole frames so we don't desync the 16-bit PCM samples.
+            var silenceBytes = (silenceMs * byteRate / 1000)
+            silenceBytes -= silenceBytes % blockAlign
+            if (silenceBytes <= 0) return bytes
+            val dataStart = dataHeaderStart + 8
+            val out = ByteArray(bytes.size + silenceBytes.toInt())
+            // Header (RIFF..data header) unchanged, then silence, then the original audio data.
+            System.arraycopy(bytes, 0, out, 0, dataStart)
+            System.arraycopy(bytes, dataStart, out, dataStart + silenceBytes.toInt(), bytes.size - dataStart)
+            fun writeU32(o: Int, v: Long) {
+                out[o] = (v and 0xFF).toByte()
+                out[o + 1] = ((v ushr 8) and 0xFF).toByte()
+                out[o + 2] = ((v ushr 16) and 0xFF).toByte()
+                out[o + 3] = ((v ushr 24) and 0xFF).toByte()
+            }
+            // Only adjust the declared sizes when they're real values; the stream-generated files
+            // use bogus ~Int.MAX placeholders that must be left alone (see wavDurationMs).
+            val availableData = (bytes.size - dataStart).toLong()
+            if (declaredDataSize in 1..availableData) {
+                writeU32(dataHeaderStart + 4, declaredDataSize + silenceBytes)
+                val riffSize = u32(4)
+                writeU32(4, riffSize + silenceBytes)
+            }
+            return out
+        }
 
         /**
          * The `[start, end)` ranges (into [text]) of the characters that are actually spoken, i.e.

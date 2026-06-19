@@ -1,5 +1,6 @@
 package com.queatz.microcosmicdisambiguation.ui
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -41,11 +42,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import com.queatz.microcosmicdisambiguation.HomeUiState
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 
@@ -65,10 +68,69 @@ fun HomeScreen(
         focusRequester.requestFocus()
     }
 
+    val configuration = LocalConfiguration.current
+    val useTwoColumnLayout = state.history.isNotEmpty() && (
+            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || configuration.screenWidthDp >= 900
+        )
+
+    if (useTwoColumnLayout) {
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            MainSection(
+                state = state,
+                situation = situation,
+                onSituationChange = { situation = it },
+                onStudy = onStudy,
+                focusRequester = focusRequester,
+                modifier = Modifier.weight(1f),
+            )
+            PreviousSessionsSection(
+                state = state,
+                onOpenSession = onOpenSession,
+                onDeleteSession = onDeleteSession,
+                onOpenSettings = onOpenSettings,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            MainSection(
+                state = state,
+                situation = situation,
+                onSituationChange = { situation = it },
+                onStudy = onStudy,
+                focusRequester = focusRequester,
+            )
+            PreviousSessionsSection(
+                state = state,
+                onOpenSession = onOpenSession,
+                onDeleteSession = onDeleteSession,
+                onOpenSettings = onOpenSettings,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MainSection(
+    state: HomeUiState,
+    situation: String,
+    onSituationChange: (String) -> Unit,
+    onStudy: (String) -> Unit,
+    focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -86,7 +148,7 @@ fun HomeScreen(
 
         OutlinedTextField(
             value = situation,
-            onValueChange = { situation = it },
+            onValueChange = onSituationChange,
             placeholder = { Text("IRL situation", style = MaterialTheme.typography.headlineSmall) },
             textStyle = MaterialTheme.typography.headlineSmall,
             shape = RoundedCornerShape(24.dp),
@@ -140,7 +202,21 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
 
+@Composable
+private fun PreviousSessionsSection(
+    state: HomeUiState,
+    onOpenSession: (Long) -> Unit,
+    onDeleteSession: (Long) -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -221,6 +297,7 @@ private fun HistoryRow(item: SituationEntity, onClick: () -> Unit, onLongClick: 
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = { showDeleteDialog = true },
@@ -231,7 +308,7 @@ private fun HistoryRow(item: SituationEntity, onClick: () -> Unit, onLongClick: 
                 .fillMaxWidth()
                 .padding(20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             val icon = item.icon
             if (!icon.isNullOrBlank()) {

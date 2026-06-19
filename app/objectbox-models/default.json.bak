@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:949373012597390392",
-      "lastPropertyId": "5:6134360466311474847",
+      "lastPropertyId": "6:4828594486163512074",
       "name": "SituationEntity",
       "properties": [
         {
@@ -33,6 +33,11 @@
           "id": "5:6134360466311474847",
           "name": "createdAt",
           "type": 6
+        },
+        {
+          "id": "6:4828594486163512074",
+          "name": "icon",
+          "type": 9
         }
       ],
       "relations": []

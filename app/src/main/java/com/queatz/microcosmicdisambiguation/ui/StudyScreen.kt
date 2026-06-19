@@ -31,12 +31,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -74,6 +76,7 @@ fun StudyScreen(
     guide: StudyGuide,
     speaker: TtsEngine,
     onClose: () -> Unit,
+    onStartMissions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (guide.structures.isEmpty()) {
@@ -83,7 +86,7 @@ fun StudyScreen(
         return
     }
 
-    var page by remember { mutableStateOf(0) }
+    var page by remember { mutableIntStateOf(0) }
     val structure = guide.structures[page]
     val isLast = page == guide.structures.lastIndex
 
@@ -106,13 +109,28 @@ fun StudyScreen(
             modifier = Modifier.weight(1f),
         )
 
-        Button(
-            onClick = {
-                if (isLast) onClose() else page++
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (isLast) "Close" else "Next")
+        // On the final sentence, invite the learner to put it into practice with the missions —
+        // simulated real-life situations they navigate using what they just studied.
+        if (isLast) {
+            Button(
+                onClick = onStartMissions,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Try a real-life mission")
+            }
+            OutlinedButton(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Close")
+            }
+        } else {
+            Button(
+                onClick = { page++ },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Next")
+            }
         }
     }
 }
@@ -286,8 +304,10 @@ private fun SentencePage(
         ) {
             // Sentence structure with blanks. Tapping it plays it out loud.
             Card(
+                shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
                     .pointerInput(structure) {
                         detectTapGestures { speakSentence() }
                     },
@@ -515,8 +535,6 @@ private fun BlankSlot(
     modifier: Modifier = Modifier,
 ) {
     var windowOffset by remember { mutableStateOf(Offset.Zero) }
-    // Frozen at drag start so emptying the slot (which moves this node) can't shift the pointer math.
-    var dragOrigin by remember { mutableStateOf(Offset.Zero) }
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = when {
@@ -536,12 +554,18 @@ private fun BlankSlot(
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { start ->
-                        dragOrigin = windowOffset
-                        onDragStart(dragOrigin + start)
+                        // windowOffset is the node's live top-left in window space and start is
+                        // relative to that node, so their sum is the pointer in window space.
+                        onDragStart(windowOffset + start)
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        onDrag(dragOrigin + change.position)
+                        // Always recompute from the *live* windowOffset: detectDragGestures reports
+                        // change.position relative to this node, and the node may reflow/resize
+                        // mid-drag (e.g. when the chip collapses or the slot empties). Adding the
+                        // current windowOffset keeps the pointer correct no matter where the node
+                        // has moved to.
+                        onDrag(windowOffset + change.position)
                     },
                     onDragEnd = onDragEnd,
                     onDragCancel = onDragEnd,
@@ -581,8 +605,6 @@ private fun WordChip(
     hidden: Boolean = false,
 ) {
     var windowOffset by remember { mutableStateOf(Offset.Zero) }
-    // Frozen at drag start so collapsing this chip (see [hidden]) can't shift the pointer math.
-    var dragOrigin by remember { mutableStateOf(Offset.Zero) }
     Box(
         modifier = modifier
             .onGloballyPositioned {
@@ -595,12 +617,18 @@ private fun WordChip(
             .pointerInput(word) {
                 detectDragGestures(
                     onDragStart = { start ->
-                        dragOrigin = windowOffset
-                        onDragStart(dragOrigin + start)
+                        // windowOffset is the node's live top-left in window space and start is
+                        // relative to that node, so their sum is the pointer in window space.
+                        onDragStart(windowOffset + start)
                     },
                     onDrag = { change, _ ->
                         change.consume()
-                        onDrag(dragOrigin + change.position)
+                        // Always recompute from the *live* windowOffset: detectDragGestures reports
+                        // change.position relative to this node, and the node may reflow/resize
+                        // mid-drag (e.g. when the chip collapses or the slot empties). Adding the
+                        // current windowOffset keeps the pointer correct no matter where the node
+                        // has moved to.
+                        onDrag(windowOffset + change.position)
                     },
                     onDragEnd = onDragEnd,
                     onDragCancel = onDragEnd,
@@ -626,8 +654,10 @@ private fun BreakdownRow(
     onTap: () -> Unit,
 ) {
     Card(
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onTap),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,

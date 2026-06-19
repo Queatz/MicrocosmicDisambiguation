@@ -1,6 +1,7 @@
 package com.queatz.microcosmicdisambiguation.ai
 
 import android.net.http.HttpResponseCache.install
+import com.queatz.microcosmicdisambiguation.data.MissionSet
 import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -18,7 +19,6 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /**
@@ -48,7 +48,7 @@ class QwenService(
      * Generates a study guide for the given situation.
      *
      * The model is asked to return a single JSON object matching [StudyGuide]: a title plus exactly
-     * 3 sentence structures, each with 4-8 words.
+     * 3 sentence structures, each with exactly 6 fill-in words.
      */
     suspend fun generateStudyGuide(situation: String): StudyGuide {
         val request = ChatRequest(
@@ -72,6 +72,36 @@ class QwenService(
             ?: error("Empty response from Qwen")
 
         return json.decodeFromString(StudyGuide.serializer(), content)
+    }
+
+    /**
+     * Generates a set of 3 real-life "missions" that simulate situations the learner can navigate
+     * using exactly what the [guide] taught them. Each mission is a short role-play with a handful
+     * of multiple-choice turns; the correct option at every turn is built from the guide's own
+     * sentences and words, so the learner is rewarded for what they studied.
+     */
+    suspend fun generateMissions(guide: StudyGuide): MissionSet {
+        val request = ChatRequest(
+            model = MODEL,
+            responseFormat = ResponseFormat(type = "json_object"),
+            messages = listOf(
+                ChatMessage(role = "system", content = MISSIONS_SYSTEM_PROMPT),
+                ChatMessage(role = "user", content = missionsUserPrompt(guide)),
+            ),
+        )
+
+        val response: ChatResponse = client.post(ENDPOINT) {
+            headers {
+                append(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+        val content = response.choices.firstOrNull()?.message?.content
+            ?: error("Empty response from Qwen")
+
+        return json.decodeFromString(MissionSet.serializer(), content)
     }
 
     /**
@@ -110,6 +140,23 @@ class QwenService(
             "say in this real-life situation: \"$situation\". The sentences must let the learner " +
             "actually carry out this specific situation, not just talk about the general topic."
 
+    /**
+     * Summarizes the studied [guide] (its title plus every sentence the learner practiced) so the
+     * model can build missions whose correct answers come straight from what was studied.
+     */
+    private fun missionsUserPrompt(guide: StudyGuide): String {
+        val lines = guide.structures.joinToString("\n") { structure ->
+            val words = structure.words.joinToString(", ") { "${it.hanzi} (${it.english})" }
+            "- Mandarin: \"${structure.template}\" | English: \"${structure.english}\" | words: $words"
+        }
+        return "The learner just studied this Mandarin lesson titled \"${guide.title}\".\n" +
+            "These are the sentence patterns and words they practiced:\n$lines\n\n" +
+            "Create 3 real-life missions that simulate situations where the learner would use " +
+            "EXACTLY these sentences and words. The correct choice at every turn must be a " +
+            "sentence the learner can build from the patterns and words above, so they succeed by " +
+            "using what they just studied."
+    }
+
     companion object {
         const val QWEN_API_KEY = "sk-6c257c3e09b349bf81c631f31ef6679a"
 
@@ -135,10 +182,13 @@ class QwenService(
 
             Design process (think before writing, do NOT show your thinking):
             1. First, mentally draft the realistic sentences the learner would actually say in this
-               exact situation (4-8 words each, natural and high-utility).
+               exact situation (natural and high-utility). Each sentence must be built from 2 "___"
+               blanks plus 2-3 fixed words that form the sentence structure (the words that stay the
+               same and hold the sentence together around the blanks).
             2. Then build each sentence "structure" from those sentences: the "template" is the
-               sentence with "___" marking the words a learner swaps in, and "words" are the actual
-               content words used to complete it for THIS situation.
+               sentence with 2 "___" marking the words a learner swaps in, surrounded by 2-3 fixed
+               structural words, and "words" are the actual content words used to complete it for
+               THIS situation.
             3. Finally, write a detailed, word-by-word "breakdown" of the COMPLETE, assembled
                sentence (the template with its blanks filled in for THIS situation). Walk through
                every word in the exact order it is spoken and define and explain each one.
@@ -149,7 +199,6 @@ class QwenService(
             - The correct words to complete each "template" for this exact situation MUST be present
               in that structure's "words" list, so the assembled sentence really expresses the
               situation.
-            - Do not pad the list with unrelated vocabulary just to reach a count.
 
             Respond with ONLY a single JSON object, no markdown, matching this schema exactly:
             {
@@ -157,9 +206,9 @@ class QwenService(
               "icon": string,                        // a single emoji that best represents the whole scenario
               "structures": [                        // EXACTLY 3 sentence structures
                 {
-                  "template": string,                // a Mandarin sentence using "___" for each blank
-                  "english": string,                 // the English meaning, using "___" for the SAME blanks, in the same order as the template
-                  "words": [                         // 4 to 8 words that fit the blanks
+                  "template": string,                // a Mandarin sentence using "___" for each of the 2 blanks
+                  "english": string,                 // the English meaning, using "___" for the SAME 2 blanks, in the same order as the template
+                  "words": [                         // EXACTLY 6 words that fit the blanks
                     {
                       "hanzi": string,                // simplified Chinese characters
                       "pinyin": string,               // pinyin with tone marks
@@ -193,10 +242,12 @@ class QwenService(
 
             Rules:
             - Use simplified Chinese characters.
-            - Each "template" must contain at least one "___" blank.
+            - Use ultra-beginner friendly Chinese.
+            - Each "template" must contain exactly 2 "___" blanks plus 2-3 fixed words that form
+              the sentence structure (the non-blank words that stay the same around the blanks).
             - Each "english" must contain the same number of "___" blanks as its "template", in
               the same order, so a word dropped into a Mandarin blank fills the matching English blank.
-            - Provide between 6 and 12 words per sentence structure.
+            - Provide EXACTLY 6 words per sentence structure.
             - For "breakdown", break the COMPLETE assembled sentence (template with blanks filled in
               for this situation) into its individual words, in the exact order they are spoken.
               Cover every word, including particles and punctuation-bearing words. Each
@@ -219,14 +270,79 @@ class QwenService(
               position: e.g. for Mandarin "这抹茶真好吃" / English "This matcha is really delicious",
               "真" must map to "really" (not "is"), and "is" must be its own chunk with "zh": "".
             - Set "punctuation": true on any "breakdown" or "alignment" entry that is a punctuation
-              mark (e.g. "，", "。", "？") rather than a real spoken word; otherwise set it to false.
+              mark (e.g. "，", "–", "。", "？") rather than a real spoken word; otherwise set it to false.
             - CRITICAL for translation quality: for every word-level English field ("words[].english"
               and "breakdown[].english"), use the exact spoken English form for that mapped chunk in
-              the sentence, not a dictionary label. Do NOT add helper words that are not in that
-              chunk. Example: use "fall" (not "to fall"), "eat" (not "to eat"), "banana" (not "a banana"
+              the sentence, not a dictionary label, and without additional contextual meanings.
+              Example: use "fall" (not "to fall"), "eat" (not "to eat"), "banana" (not "a banana"
               unless the mapped chunk literally includes "a banana").
             - Keep it beginner friendly, but make every sentence directly usable IN the situation.
             - Use a register appropriate to the situation (e.g. polite forms with strangers).
+        """.trimIndent()
+
+        private val MISSIONS_SYSTEM_PROMPT = """
+            You are an expert Mandarin Chinese tutor who designs interactive role-play missions.
+            Given the sentences and words a learner just studied, you create 3 short, realistic
+            "missions": situations the learner finds themselves in and must NAVIGATE by choosing the
+            right thing to say in Mandarin, using EXACTLY what they studied.
+
+            Each mission is a tiny conversation. On each turn the other person says one line, and the
+            learner picks what to say back from a few choices. The learner navigates the mission
+            successfully by picking the correct line every turn.
+
+            Design rules (think before writing, do NOT show your thinking):
+            - Build the CORRECT choice at every turn from the studied sentence patterns and words.
+              The learner must be able to win using only what they studied.
+            - The other (incorrect) choices must be plausible real Mandarin lines, but clearly wrong
+              for THIS moment in the conversation (e.g. answering a different question, too rude, or
+              off-topic). Never make them gibberish.
+            - Keep every Mandarin line short, natural, and beginner friendly. Use simplified
+              characters and a register appropriate to the situation.
+            - Make the 3 missions feel like 3 different real moments (e.g. different people, places,
+              or goals) that all reuse the studied language.
+
+            Respond with ONLY a single JSON object, no markdown, matching this schema exactly:
+            {
+              "missions": [                          // EXACTLY 3 missions
+                {
+                  "title": string,                   // a short title for the scene
+                  "icon": string,                    // a single emoji representing the scene
+                  "setting": string,                 // one English sentence: where the learner is and what is happening
+                  "role": string,                    // who the other person is, in English (e.g. "a taxi driver")
+                  "turns": [                          // 1-3 conversation turns, in order
+                    {
+                      "speaker": string,              // the other person's line in Mandarin ("" only for an opening turn where the learner speaks first)
+                      "speakerPinyin": string,        // pinyin with tone marks for "speaker" (""  if speaker is "")
+                      "speakerEnglish": string,       // English meaning of "speaker" ("" if speaker is "")
+                      "emoji": string,                // a single emoji depicting the other person or what they are doing
+                      "prompt": string,               // a short English nudge telling the learner what to do this turn
+                      "choices": [                    // 3 choices the learner picks between
+                        {
+                          "hanzi": string,            // the Mandarin line, simplified characters
+                          "pinyin": string,           // pinyin with tone marks
+                          "english": string,          // English meaning of the line
+                          "correct": boolean,         // true for EXACTLY ONE choice per turn
+                          "reply": string             // one English sentence: how the other person reacts to this choice
+                        }
+                      ]
+                    }
+                  ],
+                  "success": string                  // a short, warm English line celebrating that the learner navigated the situation
+                }
+              ]
+            }
+
+            Rules:
+            - EXACTLY 3 missions.
+            - 1 to 3 turns per mission.
+            - EXACTLY 3 choices per turn, with EXACTLY ONE "correct": true.
+            - Use simplified Chinese characters and ultra-beginner-friendly Mandarin.
+            - Every "reply" is in English and reacts to that specific choice. For the CORRECT choice,
+              "reply" MUST describe the positive outcome: the good thing that happens because the
+              learner said the right thing (the other person responds well and the situation moves
+              forward). For the wrong choices, gently explain what went wrong. Never leave the
+              correct choice's "reply" empty.
+            - The correct choices must come from the sentences and words the learner studied.
         """.trimIndent()
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.queatz.microcosmicdisambiguation.ai.QwenService
+import com.queatz.microcosmicdisambiguation.data.MissionSet
 import com.queatz.microcosmicdisambiguation.data.SettingsRepository
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 import com.queatz.microcosmicdisambiguation.data.SituationRepository
@@ -25,6 +26,21 @@ data class HomeUiState(
     val ttsMode: TtsMode = TtsMode.System,
 )
 
+/**
+ * UI state for the mission screen of a single study session.
+ *
+ * @param sessionId the session whose missions are loaded (0 before any load)
+ * @param isGenerating true while the missions are being generated for the first time
+ * @param missions the loaded missions, or null while still loading/generating
+ * @param error a message to show if generation failed
+ */
+data class MissionUiState(
+    val sessionId: Long = 0,
+    val isGenerating: Boolean = false,
+    val missions: MissionSet? = null,
+    val error: String? = null,
+)
+
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = SituationRepository(application)
@@ -36,6 +52,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState(ttsMode = settings.ttsMode))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    private val _missionState = MutableStateFlow(MissionUiState())
+    val missionState: StateFlow<MissionUiState> = _missionState.asStateFlow()
 
     init {
         refreshHistory()
@@ -95,6 +114,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun guide(id: Long): StudyGuide? {
         val entity = repository.get(id) ?: return null
         return repository.guideOf(entity)
+    }
+
+    /**
+     * Loads the missions for session [id], generating them from its study guide the first time and
+     * caching the result so later visits are instant. The outcome is published on [missionState].
+     * Re-invoking for the already-loaded (or in-flight) session is a no-op.
+     */
+    fun loadMissions(id: Long) {
+        val current = _missionState.value
+        if (current.sessionId == id && (current.missions != null || current.isGenerating)) return
+
+        val entity = repository.get(id)
+        if (entity == null) {
+            _missionState.value = MissionUiState(sessionId = id, error = "Session not found")
+            return
+        }
+
+        val cached = repository.missionsOf(entity)
+        if (cached != null) {
+            _missionState.value = MissionUiState(sessionId = id, missions = cached)
+            return
+        }
+
+        _missionState.value = MissionUiState(sessionId = id, isGenerating = true)
+        viewModelScope.launch {
+            try {
+                val guide = repository.guideOf(entity)
+                val missions = withContext(Dispatchers.IO) { qwen.generateMissions(guide) }
+                withContext(Dispatchers.IO) { repository.saveMissions(id, missions) }
+                _missionState.update {
+                    if (it.sessionId == id) it.copy(isGenerating = false, missions = missions) else it
+                }
+            } catch (t: Throwable) {
+                _missionState.update {
+                    if (it.sessionId == id) {
+                        it.copy(
+                            isGenerating = false,
+                            error = t.message ?: "Failed to generate missions",
+                        )
+                    } else {
+                        it
+                    }
+                }
+            }
+        }
+    }
+
+    /** Clears any loaded missions so the next [loadMissions] starts fresh (e.g. on retry). */
+    fun resetMissions() {
+        _missionState.value = MissionUiState()
     }
 
     fun title(id: Long): String = repository.get(id)?.title.orEmpty()

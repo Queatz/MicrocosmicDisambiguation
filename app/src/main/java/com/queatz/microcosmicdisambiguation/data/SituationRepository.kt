@@ -41,6 +41,18 @@ class SituationRepository(context: Context) {
     fun guideOf(entity: SituationEntity): StudyGuide =
         json.decodeFromString(StudyGuide.serializer(), entity.guideJson)
 
+    /** The cached [MissionSet] for [entity], or null if missions have not been generated yet. */
+    fun missionsOf(entity: SituationEntity): MissionSet? =
+        entity.missionJson?.takeIf { it.isNotBlank() }
+            ?.let { json.decodeFromString(MissionSet.serializer(), it) }
+
+    /** Caches [missions] for the session with [id] so they are not regenerated next time. */
+    fun saveMissions(id: Long, missions: MissionSet) {
+        val entity = box.get(id) ?: return
+        entity.missionJson = json.encodeToString(MissionSet.serializer(), missions)
+        box.put(entity)
+    }
+
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
 
