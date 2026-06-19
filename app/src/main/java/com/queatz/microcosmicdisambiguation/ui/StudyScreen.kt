@@ -357,7 +357,7 @@ private fun SentencePage(
                                                 dragPosition = startWindow
                                             }
                                         },
-                                        onDrag = { dragPosition = it },
+                                        onDrag = { dragPosition += it },
                                         onDragEnd = { finishDrag() },
                                         modifier = Modifier.animateBounds(this@LookaheadScope),
                                     )
@@ -418,7 +418,7 @@ private fun SentencePage(
                                 dragSourceBlank = null
                                 dragPosition = startWindow
                             },
-                            onDrag = { dragPosition = it },
+                            onDrag = { dragPosition += it },
                             onDragEnd = { finishDrag() },
                             modifier = Modifier.animateBounds(this@LookaheadScope),
                         )
@@ -558,14 +558,12 @@ private fun BlankSlot(
                         // relative to that node, so their sum is the pointer in window space.
                         onDragStart(windowOffset + start)
                     },
-                    onDrag = { change, _ ->
+                    onDrag = { change, dragAmount ->
                         change.consume()
-                        // Always recompute from the *live* windowOffset: detectDragGestures reports
-                        // change.position relative to this node, and the node may reflow/resize
-                        // mid-drag (e.g. when the chip collapses or the slot empties). Adding the
-                        // current windowOffset keeps the pointer correct no matter where the node
-                        // has moved to.
-                        onDrag(windowOffset + change.position)
+                        // Report the frame-to-frame delta instead of an absolute position. The
+                        // parent accumulates it onto the pointer, so the dragged card stays locked
+                        // under the finger even as other chips reflow and this node moves.
+                        onDrag(dragAmount)
                     },
                     onDragEnd = onDragEnd,
                     onDragCancel = onDragEnd,
@@ -621,14 +619,12 @@ private fun WordChip(
                         // relative to that node, so their sum is the pointer in window space.
                         onDragStart(windowOffset + start)
                     },
-                    onDrag = { change, _ ->
+                    onDrag = { change, dragAmount ->
                         change.consume()
-                        // Always recompute from the *live* windowOffset: detectDragGestures reports
-                        // change.position relative to this node, and the node may reflow/resize
-                        // mid-drag (e.g. when the chip collapses or the slot empties). Adding the
-                        // current windowOffset keeps the pointer correct no matter where the node
-                        // has moved to.
-                        onDrag(windowOffset + change.position)
+                        // Report the frame-to-frame delta instead of an absolute position. The
+                        // parent accumulates it onto the pointer, so the dragged card stays locked
+                        // under the finger even as other chips reflow and this node moves.
+                        onDrag(dragAmount)
                     },
                     onDragEnd = onDragEnd,
                     onDragCancel = onDragEnd,

@@ -119,6 +119,10 @@ class QwenService(
                 voice = TTS_VOICE,
                 languageType = "Chinese",
             ),
+            parameters = TtsParameters(
+                instructions = TTS_INSTRUCTIONS,
+                optimizeInstructions = true,
+            ),
         )
 
         val response: TtsResponse = client.post(TTS_ENDPOINT) {
@@ -166,8 +170,16 @@ class QwenService(
 
         private const val TTS_ENDPOINT =
             "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
-        private const val TTS_MODEL = "qwen3-tts-flash"
-        private const val TTS_VOICE = "Cherry"
+        private const val TTS_MODEL = "qwen3-tts-instruct-flash"
+        private const val TTS_VOICE = "Maia"
+
+        /**
+         * Steers the qwen3-tts-instruct-flash model to read every line with upbeat excitement: an
+         * energetic, cheerful tone with a lively pace and bright, rising intonation.
+         */
+        private const val TTS_INSTRUCTIONS =
+            "Speak with upbeat excitement: an energetic, cheerful and enthusiastic tone, a lively " +
+                "pace, and bright, rising intonation, as if eager to share something amazing!"
 
         private val SYSTEM_PROMPT = """
             You are an expert Mandarin Chinese tutor and curriculum designer. Given a real-life
@@ -379,6 +391,7 @@ private data class Choice(
 private data class TtsRequest(
     val model: String,
     val input: TtsInput,
+    val parameters: TtsParameters? = null,
 )
 
 @Serializable
@@ -386,6 +399,12 @@ private data class TtsInput(
     val text: String,
     val voice: String,
     @SerialName("language_type") val languageType: String,
+)
+
+@Serializable
+private data class TtsParameters(
+    val instructions: String,
+    @SerialName("optimize_instructions") val optimizeInstructions: Boolean,
 )
 
 @Serializable
