@@ -1,6 +1,10 @@
 package com.queatz.microcosmicdisambiguation.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -32,8 +36,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
@@ -49,12 +56,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.queatz.microcosmicdisambiguation.HomeUiState
+import com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    recognizer: QwenSpeechRecognizer,
     onStudy: (String) -> Unit,
     onOpenSession: (Long) -> Unit,
     onDeleteSession: (Long) -> Unit,
@@ -82,6 +93,7 @@ fun HomeScreen(
         ) {
             MainSection(
                 state = state,
+                recognizer = recognizer,
                 situation = situation,
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
@@ -105,6 +117,7 @@ fun HomeScreen(
         ) {
             MainSection(
                 state = state,
+                recognizer = recognizer,
                 situation = situation,
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
@@ -123,12 +136,55 @@ fun HomeScreen(
 @Composable
 private fun MainSection(
     state: HomeUiState,
+    recognizer: QwenSpeechRecognizer,
     situation: String,
     onSituationChange: (String) -> Unit,
     onStudy: (String) -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    var isListening by remember { mutableStateOf(false) }
+    // The text already present when dictation starts, so live results are appended rather than
+    // clobbering anything the user typed first.
+    var transcriptBase by remember { mutableStateOf("") }
+
+    DisposableEffect(recognizer) {
+        recognizer.onListeningChanged = { isListening = it }
+        recognizer.onTextChanged = { text ->
+            val base = transcriptBase
+            onSituationChange(if (base.isBlank()) text else "$base $text")
+        }
+        onDispose {
+            recognizer.onListeningChanged = null
+            recognizer.onTextChanged = null
+            recognizer.onError = null
+        }
+    }
+
+    fun beginListening() {
+        transcriptBase = situation.trimEnd()
+        recognizer.start()
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) beginListening()
+    }
+
+    fun toggleListening() {
+        if (isListening) {
+            recognizer.stop()
+        } else if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            beginListening()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -146,24 +202,46 @@ private fun MainSection(
             )
         }
 
-        OutlinedTextField(
-            value = situation,
-            onValueChange = onSituationChange,
-            placeholder = { Text("IRL situation", style = MaterialTheme.typography.headlineSmall) },
-            textStyle = MaterialTheme.typography.headlineSmall,
-            shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester),
-            enabled = !state.isGenerating,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { onStudy(situation) }),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = situation,
+                onValueChange = onSituationChange,
+                placeholder = { Text("IRL situation", style = MaterialTheme.typography.headlineSmall) },
+                textStyle = MaterialTheme.typography.headlineSmall,
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                enabled = !state.isGenerating,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { onStudy(situation) }),
+            )
+
+            IconButton(
+                onClick = { toggleListening() },
+                enabled = !state.isGenerating,
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
+                    contentDescription = if (isListening) "Stop voice input" else "Voice input",
+                    tint = if (isListening) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+        }
 
         Button(
             onClick = { onStudy(situation) },

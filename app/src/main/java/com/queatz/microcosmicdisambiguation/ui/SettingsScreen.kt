@@ -65,13 +65,13 @@ fun SettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             TtsModeOption(
                 title = "AI (Qwen)",
-                description = "Natural cloud voice with word-by-word highlighting. Requires an " +
+                description = "Natural native speaker voice. Requires an " +
                     "internet connection.",
                 selected = ttsMode == TtsMode.Ai,
                 onSelect = { onSelectMode(TtsMode.Ai) },
             )
             TtsModeOption(
-                title = "Phone system",
+                title = "System",
                 description = "Uses your device's built-in text-to-speech engine. Works offline.",
                 selected = ttsMode == TtsMode.System,
                 onSelect = { onSelectMode(TtsMode.System) },

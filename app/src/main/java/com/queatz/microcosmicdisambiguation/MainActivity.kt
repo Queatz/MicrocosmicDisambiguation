@@ -28,6 +28,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.queatz.microcosmicdisambiguation.audio.QwenSpeaker
+import com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer
 import com.queatz.microcosmicdisambiguation.audio.Speaker
 import com.queatz.microcosmicdisambiguation.audio.SpeakerStatus
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
@@ -74,6 +75,12 @@ fun MicrocosmicDisambiguationApp() {
     DisposableEffect(speaker) {
         speaker.onStatusChanged = { speakerStatus = it }
         onDispose { speaker.shutdown() }
+    }
+
+    // Real-time speech-to-text for dictating the "IRL situation" on the home screen.
+    val speechRecognizer = remember { QwenSpeechRecognizer() }
+    DisposableEffect(speechRecognizer) {
+        onDispose { speechRecognizer.shutdown() }
     }
 
     var ttsPromptDismissed by remember { mutableStateOf(false) }
@@ -140,6 +147,7 @@ fun MicrocosmicDisambiguationApp() {
             composable(ROUTE_HOME) {
                 HomeScreen(
                     state = state,
+                    recognizer = speechRecognizer,
                     onStudy = { situation -> viewModel.generate(situation) },
                     onOpenSession = { id -> navController.navigate("$ROUTE_STUDY/$id") },
                     onDeleteSession = { id -> viewModel.deleteSession(id) },

@@ -146,7 +146,7 @@ private fun MissionRunner(
     modifier: Modifier = Modifier,
 ) {
     var missionIndex by remember { mutableIntStateOf(0) }
-    // current turn within the active mission; once it passes the last turn the mission is complete
+    // current turn within the active mission
     var turnIndex by remember(missionIndex) { mutableIntStateOf(0) }
     // the choice the learner has tapped this turn, kept so we can show its consequence and let a
     // wrong pick be retried before committing
@@ -154,13 +154,14 @@ private fun MissionRunner(
 
     val mission = missions[missionIndex]
     val isLastMission = missionIndex == missions.lastIndex
-    val missionComplete = turnIndex >= mission.turns.size
+    val currentTurn = mission.turns.getOrNull(turnIndex)
+    // The final turn of the mission: completing it ends the mission directly (no success screen).
+    val isLastTurn = turnIndex >= mission.turns.lastIndex
 
     // Speak the other person's opening line whenever a new turn begins.
-    val currentTurn = mission.turns.getOrNull(turnIndex)
     LaunchedEffect(missionIndex, turnIndex) {
         val line = currentTurn?.speaker
-        if (!missionComplete && !line.isNullOrBlank()) {
+        if (!line.isNullOrBlank()) {
             speaker.speak(line)
         }
     }
@@ -184,9 +185,7 @@ private fun MissionRunner(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (missionComplete) {
-                MissionSuccessCard(mission = mission)
-            } else if (currentTurn != null) {
+            if (currentTurn != null) {
                 TurnContent(
                     turn = currentTurn,
                     selected = selected,
@@ -200,7 +199,7 @@ private fun MissionRunner(
         }
 
         MissionActions(
-            missionComplete = missionComplete,
+            isLastTurn = isLastTurn,
             isLastMission = isLastMission,
             selected = selected,
             onContinue = {
@@ -316,8 +315,10 @@ private fun TurnContent(
         }
     }
 
+    // Shuffle the choices (stable per turn) so the correct answer isn't always in the same spot.
+    val choices = remember(turn) { turn.choices.shuffled() }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        turn.choices.forEach { choice ->
+        choices.forEach { choice ->
             ChoiceCard(
                 choice = choice,
                 selected = selected,
@@ -401,48 +402,14 @@ private fun ChoiceCard(
     }
 }
 
-@Composable
-private fun MissionSuccessCard(mission: Mission) {
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(24.dp))
-            .fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(text = "🎉", style = MaterialTheme.typography.displaySmall)
-            Text(
-                text = "Situation navigated!",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = mission.success.ifBlank {
-                    "You handled this just like a local — using exactly what you studied."
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-            )
-        }
-    }
-}
-
 /**
- * The bottom action bar. While a turn is in progress it offers Continue (after a correct pick) or
- * Try again (after a wrong pick); once the mission is complete it offers the next mission or finish.
+ * The bottom action bar. After a wrong pick it offers Try again; after a correct pick it offers
+ * Continue, or — on the mission's last turn — moves straight on to the next mission (or Finish),
+ * since the positive outcome is already shown in the turn itself (no separate success screen).
  */
 @Composable
 private fun MissionActions(
-    missionComplete: Boolean,
+    isLastTurn: Boolean,
     isLastMission: Boolean,
     selected: MissionChoice?,
     onContinue: () -> Unit,
@@ -450,13 +417,6 @@ private fun MissionActions(
     onNextMission: () -> Unit,
 ) {
     when {
-        missionComplete -> Button(
-            onClick = onNextMission,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (isLastMission) "Finish" else "Next mission")
-        }
-
         selected == null -> Text(
             text = "Pick what you'd say.",
             style = MaterialTheme.typography.bodyMedium,
@@ -465,18 +425,25 @@ private fun MissionActions(
             textAlign = TextAlign.Center,
         )
 
-        selected.correct -> Button(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Continue")
-        }
-
-        else -> OutlinedButton(
+        !selected.correct -> OutlinedButton(
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Try again")
+        }
+
+        isLastTurn -> Button(
+            onClick = onNextMission,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (isLastMission) "Finish" else "Next mission")
+        }
+
+        else -> Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Continue")
         }
     }
 }
