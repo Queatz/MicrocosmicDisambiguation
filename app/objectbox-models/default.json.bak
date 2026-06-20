@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:949373012597390392",
-      "lastPropertyId": "6:4828594486163512074",
+      "lastPropertyId": "7:1714696709452914583",
       "name": "SituationEntity",
       "properties": [
         {
@@ -37,6 +37,11 @@
         {
           "id": "6:4828594486163512074",
           "name": "icon",
+          "type": 9
+        },
+        {
+          "id": "7:1714696709452914583",
+          "name": "missionJson",
           "type": 9
         }
       ],
