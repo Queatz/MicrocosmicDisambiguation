@@ -35,6 +35,7 @@ import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.TtsMode
 import com.queatz.microcosmicdisambiguation.ui.HomeScreen
 import com.queatz.microcosmicdisambiguation.ui.MissionScreen
+import com.queatz.microcosmicdisambiguation.ui.RecordingsScreen
 import com.queatz.microcosmicdisambiguation.ui.SettingsScreen
 import com.queatz.microcosmicdisambiguation.ui.StudyScreen
 import com.queatz.microcosmicdisambiguation.ui.theme.MicrocosmicDisambiguationTheme
@@ -55,6 +56,7 @@ private const val ROUTE_HOME = "home"
 private const val ROUTE_STUDY = "study"
 private const val ROUTE_MISSION = "mission"
 private const val ROUTE_SETTINGS = "settings"
+private const val ROUTE_RECORDINGS = "recordings"
 private const val ARG_ID = "id"
 
 @Composable
@@ -80,7 +82,14 @@ fun MicrocosmicDisambiguationApp() {
     // Real-time speech-to-text for dictating the "IRL situation" on the home screen.
     val speechRecognizer = remember { QwenSpeechRecognizer() }
     DisposableEffect(speechRecognizer) {
-        onDispose { speechRecognizer.shutdown() }
+        // Persist the raw audio and final transcript of each completed dictation session.
+        speechRecognizer.onSessionComplete = { audio, transcript ->
+            viewModel.saveRecording(audio, transcript)
+        }
+        onDispose {
+            speechRecognizer.onSessionComplete = null
+            speechRecognizer.shutdown()
+        }
     }
 
     var ttsPromptDismissed by remember { mutableStateOf(false) }
@@ -152,6 +161,7 @@ fun MicrocosmicDisambiguationApp() {
                     onOpenSession = { id -> navController.navigate("$ROUTE_STUDY/$id") },
                     onDeleteSession = { id -> viewModel.deleteSession(id) },
                     onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
+                    onDismissError = { viewModel.clearError() },
                 )
             }
             composable(ROUTE_SETTINGS) {
@@ -159,6 +169,15 @@ fun MicrocosmicDisambiguationApp() {
                     ttsMode = state.ttsMode,
                     onSelectMode = { viewModel.setTtsMode(it) },
                     onBack = { navController.popBackStack() },
+                    onOpenRecordings = { navController.navigate(ROUTE_RECORDINGS) },
+                )
+            }
+            composable(ROUTE_RECORDINGS) {
+                val recordings by viewModel.recordings.collectAsState()
+                RecordingsScreen(
+                    recordings = recordings,
+                    onBack = { navController.popBackStack() },
+                    onDelete = { id -> viewModel.deleteRecording(id) },
                 )
             }
             composable(

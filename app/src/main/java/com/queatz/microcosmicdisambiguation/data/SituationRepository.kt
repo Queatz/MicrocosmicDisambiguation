@@ -2,7 +2,6 @@ package com.queatz.microcosmicdisambiguation.data
 
 import android.content.Context
 import io.objectbox.Box
-import io.objectbox.BoxStore
 import io.objectbox.kotlin.boxFor
 import io.objectbox.query.QueryBuilder
 import kotlinx.serialization.json.Json
@@ -12,7 +11,7 @@ import kotlinx.serialization.json.Json
  */
 class SituationRepository(context: Context) {
 
-    private val box: Box<SituationEntity> = store(context).boxFor()
+    private val box: Box<SituationEntity> = ObjectBox.store(context).boxFor()
 
     /** Returns all saved situations, newest first. */
     fun all(): List<SituationEntity> =
@@ -55,17 +54,5 @@ class SituationRepository(context: Context) {
 
     companion object {
         private val json = Json { ignoreUnknownKeys = true }
-
-        @Volatile
-        private var boxStore: BoxStore? = null
-
-        /** Lazily builds a single application-wide [BoxStore]. */
-        private fun store(context: Context): BoxStore =
-            boxStore ?: synchronized(this) {
-                boxStore ?: MyObjectBox.builder()
-                    .androidContext(context.applicationContext)
-                    .build()
-                    .also { boxStore = it }
-            }
     }
 }

@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.queatz.microcosmicdisambiguation.ai.QwenService
 import com.queatz.microcosmicdisambiguation.data.MissionSet
+import com.queatz.microcosmicdisambiguation.data.RecordingEntity
+import com.queatz.microcosmicdisambiguation.data.RecordingRepository
 import com.queatz.microcosmicdisambiguation.data.SettingsRepository
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 import com.queatz.microcosmicdisambiguation.data.SituationRepository
@@ -44,6 +46,7 @@ data class MissionUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = SituationRepository(application)
+    private val recordingRepository = RecordingRepository(application)
     private val settings = SettingsRepository(application)
 
     /** Exposed so the UI can build the Qwen-backed text-to-speech engine. */
@@ -56,8 +59,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _missionState = MutableStateFlow(MissionUiState())
     val missionState: StateFlow<MissionUiState> = _missionState.asStateFlow()
 
+    private val _recordings = MutableStateFlow<List<RecordingEntity>>(emptyList())
+    val recordings: StateFlow<List<RecordingEntity>> = _recordings.asStateFlow()
+
     init {
         refreshHistory()
+        refreshRecordings()
     }
 
     /** Persists the selected text-to-speech engine and updates the UI state. */
@@ -68,6 +75,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun refreshHistory() {
         _uiState.update { it.copy(history = repository.all()) }
+    }
+
+    private fun refreshRecordings() {
+        _recordings.value = recordingRepository.all()
+    }
+
+    /** Persists a completed dictation [audio]/[transcript] pair, then refreshes the recordings list. */
+    fun saveRecording(audio: ByteArray, transcript: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { recordingRepository.save(audio, transcript) }
+            refreshRecordings()
+        }
+    }
+
+    /** Deletes the stored recording with [id] (and its audio file) and refreshes the list. */
+    fun deleteRecording(id: Long) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { recordingRepository.delete(id) }
+            refreshRecordings()
+        }
     }
 
     /**

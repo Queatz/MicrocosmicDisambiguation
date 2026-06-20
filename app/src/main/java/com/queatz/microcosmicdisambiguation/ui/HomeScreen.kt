@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -54,6 +55,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -70,9 +73,10 @@ fun HomeScreen(
     onOpenSession: (Long) -> Unit,
     onDeleteSession: (Long) -> Unit,
     onOpenSettings: () -> Unit,
+    onDismissError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var situation by remember { mutableStateOf("") }
+    var situation by remember { mutableStateOf(TextFieldValue("")) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
@@ -97,6 +101,7 @@ fun HomeScreen(
                 situation = situation,
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
+                onDismissError = onDismissError,
                 focusRequester = focusRequester,
                 modifier = Modifier.weight(1f),
             )
@@ -121,6 +126,7 @@ fun HomeScreen(
                 situation = situation,
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
+                onDismissError = onDismissError,
                 focusRequester = focusRequester,
             )
             PreviousSessionsSection(
@@ -137,9 +143,10 @@ fun HomeScreen(
 private fun MainSection(
     state: HomeUiState,
     recognizer: QwenSpeechRecognizer,
-    situation: String,
-    onSituationChange: (String) -> Unit,
+    situation: TextFieldValue,
+    onSituationChange: (TextFieldValue) -> Unit,
     onStudy: (String) -> Unit,
+    onDismissError: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
@@ -153,7 +160,9 @@ private fun MainSection(
         recognizer.onListeningChanged = { isListening = it }
         recognizer.onTextChanged = { text ->
             val base = transcriptBase
-            onSituationChange(if (base.isBlank()) text else "$base $text")
+            val combined = if (base.isBlank()) text else "$base $text"
+            // Keep the caret at the end so the latest dictated words are always visible.
+            onSituationChange(TextFieldValue(combined, selection = TextRange(combined.length)))
         }
         onDispose {
             recognizer.onListeningChanged = null
@@ -163,7 +172,7 @@ private fun MainSection(
     }
 
     fun beginListening() {
-        transcriptBase = situation.trimEnd()
+        transcriptBase = situation.text.trimEnd()
         recognizer.start()
     }
 
@@ -223,7 +232,7 @@ private fun MainSection(
                     .focusRequester(focusRequester),
                 enabled = !state.isGenerating,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { onStudy(situation) }),
+                keyboardActions = KeyboardActions(onGo = { onStudy(situation.text) }),
             )
 
             IconButton(
@@ -244,8 +253,8 @@ private fun MainSection(
         }
 
         Button(
-            onClick = { onStudy(situation) },
-            enabled = situation.isNotBlank() && !state.isGenerating,
+            onClick = { onStudy(situation.text) },
+            enabled = situation.text.isNotBlank() && !state.isGenerating,
             shape = RoundedCornerShape(20.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -269,7 +278,10 @@ private fun MainSection(
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onDismissError() },
                 ) {
                     Text(
                         text = error,

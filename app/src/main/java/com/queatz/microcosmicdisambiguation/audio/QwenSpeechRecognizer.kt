@@ -18,6 +18,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -61,9 +62,21 @@ class QwenSpeechRecognizer(
     /** The in-progress sentence the server is still refining. */
     private var partialText: String = ""
 
+    /** Accumulates the raw PCM frames captured during the session so they can be saved on stop. */
+    private val recordedAudio = ByteArrayOutputStream()
+
+    /** Guards against delivering [onSessionComplete] more than once per session. */
+    private val completed = AtomicBoolean(false)
+
     var onTextChanged: ((String) -> Unit)? = null
     var onListeningChanged: ((Boolean) -> Unit)? = null
     var onError: ((String) -> Unit)? = null
+
+    /**
+     * Invoked once a session ends normally, delivering the raw 16 kHz mono 16-bit PCM audio that was
+     * captured along with the final transcript. Not called if the session fails or is shut down.
+     */
+    var onSessionComplete: ((audio: ByteArray, transcript: String) -> Unit)? = null
 
     val isListening: Boolean
         get() = listening.get()
@@ -78,6 +91,8 @@ class QwenSpeechRecognizer(
 
         finalizedText = ""
         partialText = ""
+        completed.set(false)
+        synchronized(recordedAudio) { recordedAudio.reset() }
         notifyListening(true)
 
         val taskId = UUID.randomUUID().toString().replace("-", "").take(32)
@@ -194,6 +209,7 @@ class QwenSpeechRecognizer(
                     if (read > 0) {
                         val frame: ByteString = buffer.toByteString(0, read)
                         webSocket.send(frame)
+                        synchronized(recordedAudio) { recordedAudio.write(buffer, 0, read) }
                     }
                 }
             } catch (t: Throwable) {
@@ -220,12 +236,24 @@ class QwenSpeechRecognizer(
         if (listening.compareAndSet(true, false)) {
             notifyListening(false)
         }
+        deliverRecording()
+    }
+
+    /** Hands the captured audio and final transcript to [onSessionComplete] exactly once. */
+    private fun deliverRecording() {
+        if (!completed.compareAndSet(false, true)) return
+        val audio = synchronized(recordedAudio) { recordedAudio.toByteArray() }
+        val transcript = finalizedText
+        if (audio.isEmpty() || transcript.isBlank()) return
+        mainHandler.post { onSessionComplete?.invoke(audio, transcript) }
     }
 
     private fun fail(message: String) {
         stopRecording()
         webSocket = null
         listening.set(false)
+        // A failed session shouldn't produce a saved recording.
+        completed.set(true)
         mainHandler.post {
             onListeningChanged?.invoke(false)
             onError?.invoke(message)
@@ -235,6 +263,8 @@ class QwenSpeechRecognizer(
     /** Releases all resources. Call when the recognizer is no longer needed. */
     fun shutdown() {
         stopRecording()
+        // Tearing down the recognizer isn't a normal session end, so suppress delivery.
+        completed.set(true)
         webSocket?.close(1000, null)
         webSocket = null
         listening.set(false)
