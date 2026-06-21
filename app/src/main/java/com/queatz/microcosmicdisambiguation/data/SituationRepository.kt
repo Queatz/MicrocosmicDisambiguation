@@ -25,20 +25,29 @@ class SituationRepository(context: Context) {
     /** Removes the stored situation with [id]. Returns true if a row was deleted. */
     fun delete(id: Long): Boolean = box.remove(id)
 
-    /** Persists a generated study guide and returns the stored entity id. */
-    fun save(situation: String, guide: StudyGuide): Long {
+    /** Persists a generated study guide (for the given [languages]) and returns the stored entity id. */
+    fun save(situation: String, guide: StudyGuide, languages: LanguagePair): Long {
         val entity = SituationEntity(
             situation = situation,
             title = guide.title.ifBlank { situation },
             icon = guide.icon,
             guideJson = json.encodeToString(StudyGuide.serializer(), guide),
             createdAt = System.currentTimeMillis(),
+            sourceLang = languages.source.name,
+            targetLang = languages.target.name,
         )
         return box.put(entity)
     }
 
     fun guideOf(entity: SituationEntity): StudyGuide =
         json.decodeFromString(StudyGuide.serializer(), entity.guideJson)
+
+    /** The [LanguagePair] this session was generated for, defaulting sensibly for legacy rows. */
+    fun languagePairOf(entity: SituationEntity): LanguagePair =
+        LanguagePair(
+            source = Language.fromName(entity.sourceLang, LanguagePair.Default.source),
+            target = Language.fromName(entity.targetLang, LanguagePair.Default.target),
+        )
 
     /** The cached [MissionSet] for [entity], or null if missions have not been generated yet. */
     fun missionsOf(entity: SituationEntity): MissionSet? =

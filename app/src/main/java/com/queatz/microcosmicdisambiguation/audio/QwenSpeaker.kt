@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import com.queatz.microcosmicdisambiguation.ai.QwenService
 import com.queatz.microcosmicdisambiguation.data.BLANK
+import com.queatz.microcosmicdisambiguation.data.Language
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,6 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
 class QwenSpeaker(
     context: Context,
     private val qwen: QwenService,
+    private val language: Language,
 ) : TtsEngine {
 
     private val appContext = context.applicationContext
@@ -70,7 +72,7 @@ class QwenSpeaker(
 
         // The characters the listener will actually hear, mapped back to their offsets in [text],
         // so the emitted ranges line up with what the UI renders (including the blank marker).
-        val speakable = speakableRanges(text)
+        val speakable = speakableRanges(text, language.characterSegmented)
         // Text sent for synthesis: drop the blank markers so the model doesn't read underscores.
         val synthesisText = text.replace(BLANK, " ")
         if (synthesisText.isBlank()) {
@@ -185,7 +187,7 @@ class QwenSpeaker(
     /** Returns the cached audio for [text], generating and caching it on first use. */
     private suspend fun audioFor(text: String): File {
         audioCache[text]?.let { if (it.exists()) return it }
-        val bytes = qwen.synthesizeSpeech(text)
+        val bytes = qwen.synthesizeSpeech(text, language)
         // Prepend a short lead-in of silence so the first few milliseconds of speech are never
         // clipped before playback ramps up.
         val padded = prependSilence(bytes, LEAD_SILENCE_MS)
@@ -361,11 +363,20 @@ class QwenSpeaker(
         }
 
         /**
-         * The `[start, end)` ranges (into [text]) of the characters that are actually spoken, i.e.
-         * skipping whitespace, the blank marker, and punctuation. Used to drive proportional
-         * highlighting in sync with the generated audio.
+         * The `[start, end)` ranges (into [text]) of the units that are actually spoken, used to
+         * drive proportional highlighting in sync with the generated audio.
+         *
+         * For [characterSegmented] languages (e.g. Chinese, Japanese), which are written without
+         * spaces between words, each speakable character becomes its own range. For
+         * whitespace-delimited languages (e.g. English, Russian, Vietnamese, Korean), each
+         * whitespace-separated word becomes a single range, so the highlight advances word by word
+         * rather than letter by letter. The blank marker and whitespace are skipped in both modes.
          */
-        private fun speakableRanges(text: String): List<IntRange> {
+        private fun speakableRanges(text: String, characterSegmented: Boolean): List<IntRange> =
+            if (characterSegmented) characterRanges(text) else wordRanges(text)
+
+        /** Per-character speakable ranges, for languages written without spaces between words. */
+        private fun characterRanges(text: String): List<IntRange> {
             val ranges = mutableListOf<IntRange>()
             var i = 0
             while (i < text.length) {
@@ -378,6 +389,28 @@ class QwenSpeaker(
                     ranges.add(i..i)
                 }
                 i++
+            }
+            return ranges
+        }
+
+        /** Per-word speakable ranges, for whitespace-delimited languages. */
+        private fun wordRanges(text: String): List<IntRange> {
+            val ranges = mutableListOf<IntRange>()
+            var i = 0
+            while (i < text.length) {
+                if (text.startsWith(BLANK, i)) {
+                    i += BLANK.length
+                    continue
+                }
+                if (text[i].isWhitespace()) {
+                    i++
+                    continue
+                }
+                val start = i
+                while (i < text.length && !text[i].isWhitespace() && !text.startsWith(BLANK, i)) {
+                    i++
+                }
+                ranges.add(start..(i - 1))
             }
             return ranges
         }

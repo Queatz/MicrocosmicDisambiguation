@@ -1,6 +1,8 @@
 package com.queatz.microcosmicdisambiguation.ai
 
 import android.net.http.HttpResponseCache.install
+import com.queatz.microcosmicdisambiguation.data.Language
+import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.MissionSet
 import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import io.ktor.client.HttpClient
@@ -50,13 +52,13 @@ class QwenService(
      * The model is asked to return a single JSON object matching [StudyGuide]: a title plus exactly
      * 3 sentence structures, each with exactly 6 fill-in words.
      */
-    suspend fun generateStudyGuide(situation: String): StudyGuide {
+    suspend fun generateStudyGuide(situation: String, languages: LanguagePair): StudyGuide {
         val request = ChatRequest(
             model = MODEL,
             responseFormat = ResponseFormat(type = "json_object"),
             messages = listOf(
-                ChatMessage(role = "system", content = SYSTEM_PROMPT),
-                ChatMessage(role = "user", content = userPrompt(situation)),
+                ChatMessage(role = "system", content = systemPrompt(languages)),
+                ChatMessage(role = "user", content = userPrompt(situation, languages)),
             ),
         )
 
@@ -80,13 +82,13 @@ class QwenService(
      * of multiple-choice turns; the correct option at every turn is built from the guide's own
      * sentences and words, so the learner is rewarded for what they studied.
      */
-    suspend fun generateMissions(guide: StudyGuide): MissionSet {
+    suspend fun generateMissions(guide: StudyGuide, languages: LanguagePair): MissionSet {
         val request = ChatRequest(
             model = MODEL,
             responseFormat = ResponseFormat(type = "json_object"),
             messages = listOf(
-                ChatMessage(role = "system", content = MISSIONS_SYSTEM_PROMPT),
-                ChatMessage(role = "user", content = missionsUserPrompt(guide)),
+                ChatMessage(role = "system", content = missionsSystemPrompt(languages)),
+                ChatMessage(role = "user", content = missionsUserPrompt(guide, languages)),
             ),
         )
 
@@ -111,13 +113,13 @@ class QwenService(
      *
      * Throws if the API call fails or returns no audio URL.
      */
-    suspend fun synthesizeSpeech(text: String): ByteArray {
+    suspend fun synthesizeSpeech(text: String, language: Language): ByteArray {
         val request = TtsRequest(
             model = TTS_MODEL,
             input = TtsInput(
                 text = text,
-                voice = TTS_VOICE,
-                languageType = "Chinese",
+                voice = language.ttsVoice,
+                languageType = language.ttsLanguageType,
             ),
             parameters = TtsParameters(
                 instructions = TTS_INSTRUCTIONS,
@@ -139,21 +141,24 @@ class QwenService(
         return client.get(url).readBytes()
     }
 
-    private fun userPrompt(situation: String): String =
-        "Create a Mandarin Chinese study guide that teaches the learner EXACTLY what they need to " +
-            "say in this real-life situation: \"$situation\". The sentences must let the learner " +
-            "actually carry out this specific situation, not just talk about the general topic."
+    private fun userPrompt(situation: String, languages: LanguagePair): String =
+        "Create a ${languages.target.displayName} study guide that teaches the learner EXACTLY " +
+            "what they need to say in this real-life situation: \"$situation\". The sentences must " +
+            "let the learner actually carry out this specific situation, not just talk about the " +
+            "general topic."
 
     /**
      * Summarizes the studied [guide] (its title plus every sentence the learner practiced) so the
      * model can build missions whose correct answers come straight from what was studied.
      */
-    private fun missionsUserPrompt(guide: StudyGuide): String {
+    private fun missionsUserPrompt(guide: StudyGuide, languages: LanguagePair): String {
+        val target = languages.target.displayName
+        val source = languages.source.displayName
         val lines = guide.structures.joinToString("\n") { structure ->
             val words = structure.words.joinToString(", ") { "${it.hanzi} (${it.english})" }
-            "- Mandarin: \"${structure.template}\" | English: \"${structure.english}\" | words: $words"
+            "- $target: \"${structure.template}\" | $source: \"${structure.english}\" | words: $words"
         }
-        return "The learner just studied this Mandarin lesson titled \"${guide.title}\".\n" +
+        return "The learner just studied this $target lesson titled \"${guide.title}\".\n" +
             "These are the sentence patterns and words they practiced:\n$lines\n\n" +
             "Create 3 real-life missions that simulate situations where the learner would use " +
             "EXACTLY these sentences and words. The correct choice at every turn must be a " +
@@ -171,7 +176,6 @@ class QwenService(
         private const val TTS_ENDPOINT =
             "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
         private const val TTS_MODEL = "qwen3-tts-instruct-flash"
-        private const val TTS_VOICE = "Maia"
 
         /**
          * Steers the qwen3-tts-instruct-flash model to read every line with upbeat excitement: an
@@ -181,16 +185,35 @@ class QwenService(
             "Speak with upbeat excitement: an energetic, cheerful and enthusiastic tone, a lively " +
                 "pace, and bright, rising intonation, as if eager to share something amazing!"
 
-        private val SYSTEM_PROMPT = """
-            You are an expert Mandarin Chinese tutor and curriculum designer. Given a real-life
-            situation, you create a study guide that teaches the learner EXACTLY what they need to
-            say to handle THAT specific situation.
+        private fun systemPrompt(languages: LanguagePair): String {
+            val target = languages.target.displayName
+            val source = languages.source.displayName
+            val script = languages.target.scriptDescription
+            val romanizationField = if (languages.target.usesRomanization) {
+                "a romanization (pronunciation guide) for this word"
+            } else {
+                "leave this an empty string \"\"; $target needs no separate romanization"
+            }
+            val romanizationRule = if (languages.target.usesRomanization) {
+                "Provide an accurate romanization in every \"romanization\" field."
+            } else {
+                "Leave every \"romanization\" field as an empty string \"\"; $target is written in " +
+                    "the Latin alphabet and needs no separate romanization."
+            }
+            return """
+            You are an expert $target tutor and curriculum designer. The learner already knows
+            $source and wants to learn $target. Given a real-life situation, you create a study
+            guide that teaches the learner EXACTLY what they need to say to handle THAT specific
+            situation.
 
             The learner enters an in-real-life situation and must learn precisely what to speak in
             it. The study guide fails if it only teaches the general topic instead of the situation.
             For example, for "offer him a banana", a guide that just lists "banana / apple / grape"
-            is useless. Instead it must teach the learner to actually offer the banana, e.g.
-            "你想吃香蕉吗？" ("Do you want to eat a banana?") or "给你香蕉。" ("Here is a banana for you.").
+            is useless. Instead it must teach the learner to actually offer the banana, e.g. the
+            $target for "Do you want to eat a banana?" or "Here is a banana for you.".
+
+            Write all $target content in $script. Write every translation, explanation, and gloss in
+            $source.
 
             Design process (think before writing, do NOT show your thinking):
             1. First, mentally draft the realistic sentences the learner would actually say in this
@@ -214,37 +237,37 @@ class QwenService(
 
             Respond with ONLY a single JSON object, no markdown, matching this schema exactly:
             {
-              "title": string,                       // a short title for the situation
+              "title": string,                       // a short title for the situation, in $source
               "icon": string,                        // a single emoji that best represents the whole scenario
               "structures": [                        // EXACTLY 3 sentence structures
                 {
-                  "template": string,                // a Mandarin sentence using "___" for each of the 2 blanks
-                  "english": string,                 // the English meaning, using "___" for the SAME 2 blanks, in the same order as the template
+                  "template": string,                // a $target sentence using "___" for each of the 2 blanks
+                  "translation": string,             // the $source meaning, using "___" for the SAME 2 blanks, in the same order as the template
                   "words": [                         // EXACTLY 6 words that fit the blanks
                     {
-                      "hanzi": string,                // simplified Chinese characters
-                      "pinyin": string,               // pinyin with tone marks
-                      "english": string,              // exact spoken English gloss used in the sentence chunk (not dictionary form)
+                      "text": string,                 // the word in $target ($script)
+                      "romanization": string,         // $romanizationField
+                      "translation": string,          // exact spoken $source gloss used in the sentence chunk (not dictionary form)
                       "emoji": string                 // a single emoji that depicts the word
                     }
                   ],
                   "breakdown": [                      // a word-by-word breakdown of the COMPLETE assembled sentence, in spoken order
                     {
-                      "hanzi": string,                // this word, in simplified Chinese characters
-                      "pinyin": string,               // pinyin with tone marks
-                      "english": string,              // exact spoken English gloss for this word/chunk in this sentence
+                      "text": string,                 // this word, in $target ($script)
+                      "romanization": string,         // $romanizationField
+                      "translation": string,          // exact spoken $source gloss for this word/chunk in this sentence
                       "emoji": string,                // a single emoji that depicts the word
-                      "explanation": string,          // a short, friendly note on what this word does in the sentence
+                      "explanation": string,          // a short, friendly note (in $source) on what this word does in the sentence
                       "punctuation": boolean          // true if this entry is a punctuation mark, not a real word
                     }
                   ],
                   "tokens": [                         // the COMPLETE assembled sentence split into individual words, in spoken order
                     string                            // one word (or punctuation mark) of the assembled sentence
                   ],
-                  "alignment": [                      // aligned Mandarin/English chunk pairs, in spoken order
+                  "alignment": [                      // aligned $target/$source chunk pairs, in spoken order
                     {
-                      "zh": string,                   // a span of the assembled Mandarin sentence (MUST be "" for English-only words like "is"/"a"/"the" that have no Mandarin)
-                      "en": string,                   // the EXACT span of the "english" sentence that this Mandarin maps to (may be "" for Mandarin-only particles)
+                      "target": string,               // a span of the assembled $target sentence (MUST be "" for $source-only words that have no $target)
+                      "source": string,               // the EXACT span of the "translation" sentence that this $target maps to (may be "" for $target-only particles)
                       "punctuation": boolean          // true if this chunk is a punctuation mark, not a real word
                     }
                   ]
@@ -253,13 +276,14 @@ class QwenService(
             }
 
             Rules:
-            - Use simplified Chinese characters.
-            - Use ultra-beginner friendly Chinese.
+            - Write all $target text in $script.
+            - Use ultra-beginner friendly $target.
             - Each "template" must contain exactly 2 "___" blanks plus 2-3 fixed words that form
               the sentence structure (the non-blank words that stay the same around the blanks).
-            - Each "english" must contain the same number of "___" blanks as its "template", in
-              the same order, so a word dropped into a Mandarin blank fills the matching English blank.
+            - Each "translation" must contain the same number of "___" blanks as its "template", in
+              the same order, so a word dropped into a $target blank fills the matching $source blank.
             - Provide EXACTLY 6 words per sentence structure.
+            - $romanizationRule
             - For "breakdown", break the COMPLETE assembled sentence (template with blanks filled in
               for this situation) into its individual words, in the exact order they are spoken.
               Cover every word, including particles and punctuation-bearing words. Each
@@ -268,35 +292,45 @@ class QwenService(
             - For "tokens", split the SAME COMPLETE assembled sentence into its individual words in
               spoken order (the same words as "breakdown", including particles and any punctuation).
               Concatenating all "tokens" in order MUST reproduce the assembled sentence exactly.
-            - For "alignment", break BOTH the assembled Mandarin sentence and the assembled English
-              "english" sentence into aligned chunks, in spoken (Mandarin) order. Each chunk's "zh"
-              is a span of the Mandarin sentence and "en" is the EXACT matching span of the English
-              sentence, so a learner can see which English words correspond to each Mandarin word.
-              Concatenating all "zh" in order MUST reproduce the assembled Mandarin sentence exactly,
-              and concatenating all "en" in order MUST reproduce the assembled English sentence
-              exactly (including spaces). When a Mandarin word has no English equivalent (e.g. the
-              particle "吗"), use "en": "". When an English word has no Mandarin equivalent (e.g.
-              the copula "is", or "a"/"the"), put it in its OWN separate chunk with "zh": "" — do
-              NOT attach it to a neighbouring Mandarin word, otherwise that Mandarin word would
-              wrongly highlight the unrelated English filler. Align purely by MEANING, never by
-              position: e.g. for Mandarin "这抹茶真好吃" / English "This matcha is really delicious",
-              "真" must map to "really" (not "is"), and "is" must be its own chunk with "zh": "".
+            - For "alignment", break BOTH the assembled $target sentence and the assembled $source
+              "translation" sentence into aligned chunks, in spoken ($target) order. Each chunk's
+              "target" is a span of the $target sentence and "source" is the EXACT matching span of
+              the $source sentence, so a learner can see which $source words correspond to each
+              $target word. Concatenating all "target" in order MUST reproduce the assembled $target
+              sentence exactly, and concatenating all "source" in order MUST reproduce the assembled
+              $source sentence exactly (including spaces). When a $target word has no $source
+              equivalent (e.g. a grammatical particle), use "source": "". When a $source word has no
+              $target equivalent (e.g. an article like "a"/"the", or a copula), put it in its OWN
+              separate chunk with "target": "" — do NOT attach it to a neighbouring $target word,
+              otherwise that $target word would wrongly highlight the unrelated $source filler. Align
+              purely by MEANING, never by position.
             - Set "punctuation": true on any "breakdown" or "alignment" entry that is a punctuation
-              mark (e.g. "，", "–", "。", "？") rather than a real spoken word; otherwise set it to false.
-            - CRITICAL for translation quality: for every word-level English field ("words[].english"
-              and "breakdown[].english"), use the exact spoken English form for that mapped chunk in
-              the sentence, not a dictionary label, and without additional contextual meanings.
-              Example: use "fall" (not "to fall"), "eat" (not "to eat"), "banana" (not "a banana"
-              unless the mapped chunk literally includes "a banana").
+              mark rather than a real spoken word; otherwise set it to false.
+            - CRITICAL for translation quality: for every word-level $source field
+              ("words[].translation" and "breakdown[].translation"), use the exact spoken $source
+              form for that mapped chunk in the sentence, not a dictionary label, and without
+              additional contextual meanings. Example: use "fall" (not "to fall"), "eat" (not "to
+              eat").
             - Keep it beginner friendly, but make every sentence directly usable IN the situation.
             - Use a register appropriate to the situation (e.g. polite forms with strangers).
         """.trimIndent()
+        }
 
-        private val MISSIONS_SYSTEM_PROMPT = """
-            You are an expert Mandarin Chinese tutor who designs interactive role-play missions.
-            Given the sentences and words a learner just studied, you create 3 short, realistic
-            "missions": situations the learner finds themselves in and must NAVIGATE by choosing the
-            right thing to say in Mandarin, using EXACTLY what they studied.
+        private fun missionsSystemPrompt(languages: LanguagePair): String {
+            val target = languages.target.displayName
+            val source = languages.source.displayName
+            val script = languages.target.scriptDescription
+            val romanizationField = if (languages.target.usesRomanization) {
+                "a romanization (pronunciation guide)"
+            } else {
+                "leave empty (\"\"); $target needs no separate romanization"
+            }
+            return """
+            You are an expert $target tutor who designs interactive role-play missions for a learner
+            who already knows $source. Given the sentences and words a learner just studied, you
+            create 3 short, realistic "missions": situations the learner finds themselves in and
+            must NAVIGATE by choosing the right thing to say in $target, using EXACTLY what they
+            studied.
 
             Each mission is a tiny conversation. On each turn the other person says one line, and the
             learner picks what to say back from a few choices. The learner navigates the mission
@@ -305,11 +339,11 @@ class QwenService(
             Design rules (think before writing, do NOT show your thinking):
             - Build the CORRECT choice at every turn from the studied sentence patterns and words.
               The learner must be able to win using only what they studied.
-            - The other (incorrect) choices must be plausible real Mandarin lines, but clearly wrong
+            - The other (incorrect) choices must be plausible real $target lines, but clearly wrong
               for THIS moment in the conversation (e.g. answering a different question, too rude, or
               off-topic). Never make them gibberish.
-            - Keep every Mandarin line short, natural, and beginner friendly. Use simplified
-              characters and a register appropriate to the situation.
+            - Keep every $target line short, natural, and beginner friendly. Write it in $script and
+              use a register appropriate to the situation.
             - Make the 3 missions feel like 3 different real moments (e.g. different people, places,
               or goals) that all reuse the studied language.
 
@@ -317,29 +351,29 @@ class QwenService(
             {
               "missions": [                          // EXACTLY 3 missions
                 {
-                  "title": string,                   // a short title for the scene
+                  "title": string,                   // a short title for the scene, in $source
                   "icon": string,                    // a single emoji representing the scene
-                  "setting": string,                 // one English sentence: where the learner is and what is happening
-                  "role": string,                    // who the other person is, in English (e.g. "a taxi driver")
+                  "setting": string,                 // one $source sentence: where the learner is and what is happening
+                  "role": string,                    // who the other person is, in $source (e.g. "a taxi driver")
                   "turns": [                          // 1-3 conversation turns, in order
                     {
-                      "speaker": string,              // the other person's line in Mandarin ("" only for an opening turn where the learner speaks first)
-                      "speakerPinyin": string,        // pinyin with tone marks for "speaker" (""  if speaker is "")
-                      "speakerEnglish": string,       // English meaning of "speaker" ("" if speaker is "")
+                      "speaker": string,              // the other person's line in $target ("" only for an opening turn where the learner speaks first)
+                      "speakerRomanization": string,  // $romanizationField for "speaker" ("" if speaker is "")
+                      "speakerTranslation": string,   // $source meaning of "speaker" ("" if speaker is "")
                       "emoji": string,                // a single emoji depicting the other person or what they are doing
-                      "prompt": string,               // a short English nudge telling the learner what to do this turn
+                      "prompt": string,               // a short $source nudge telling the learner what to do this turn
                       "choices": [                    // 3 choices the learner picks between
                         {
-                          "hanzi": string,            // the Mandarin line, simplified characters
-                          "pinyin": string,           // pinyin with tone marks
-                          "english": string,          // English meaning of the line
+                          "text": string,             // the $target line, in $script
+                          "romanization": string,     // $romanizationField
+                          "translation": string,      // $source meaning of the line
                           "correct": boolean,         // true for EXACTLY ONE choice per turn
-                          "reply": string             // one English sentence: how the other person reacts to this choice
+                          "reply": string             // one $source sentence: how the other person reacts to this choice
                         }
                       ]
                     }
                   ],
-                  "success": string                  // a short, warm English line celebrating that the learner navigated the situation
+                  "success": string                  // a short, warm $source line celebrating that the learner navigated the situation
                 }
               ]
             }
@@ -348,14 +382,15 @@ class QwenService(
             - EXACTLY 3 missions.
             - 1 to 3 turns per mission.
             - EXACTLY 3 choices per turn, with EXACTLY ONE "correct": true.
-            - Use simplified Chinese characters and ultra-beginner-friendly Mandarin.
-            - Every "reply" is in English and reacts to that specific choice. For the CORRECT choice,
+            - Write all $target text in $script with ultra-beginner-friendly $target.
+            - Every "reply" is in $source and reacts to that specific choice. For the CORRECT choice,
               "reply" MUST describe the positive outcome: the good thing that happens because the
               learner said the right thing (the other person responds well and the situation moves
               forward). For the wrong choices, gently explain what went wrong. Never leave the
               correct choice's "reply" empty.
             - The correct choices must come from the sentences and words the learner studied.
         """.trimIndent()
+        }
     }
 }
 

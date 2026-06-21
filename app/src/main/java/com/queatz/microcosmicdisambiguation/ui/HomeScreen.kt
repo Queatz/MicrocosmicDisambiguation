@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +29,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -57,12 +60,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.queatz.microcosmicdisambiguation.HomeUiState
+import com.queatz.microcosmicdisambiguation.R
 import com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer
+import com.queatz.microcosmicdisambiguation.data.Language
+import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 
 @Composable
@@ -74,6 +81,7 @@ fun HomeScreen(
     onDeleteSession: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     onDismissError: () -> Unit,
+    onTargetLanguageChange: (Language) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var situation by remember { mutableStateOf(TextFieldValue("")) }
@@ -102,6 +110,7 @@ fun HomeScreen(
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
                 onDismissError = onDismissError,
+                onTargetLanguageChange = onTargetLanguageChange,
                 focusRequester = focusRequester,
                 modifier = Modifier.weight(1f),
             )
@@ -127,6 +136,7 @@ fun HomeScreen(
                 onSituationChange = { situation = it },
                 onStudy = onStudy,
                 onDismissError = onDismissError,
+                onTargetLanguageChange = onTargetLanguageChange,
                 focusRequester = focusRequester,
             )
             PreviousSessionsSection(
@@ -147,6 +157,7 @@ private fun MainSection(
     onSituationChange: (TextFieldValue) -> Unit,
     onStudy: (String) -> Unit,
     onDismissError: () -> Unit,
+    onTargetLanguageChange: (Language) -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
@@ -198,14 +209,24 @@ private fun MainSection(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            TargetLanguageButton(
+                languagePair = state.languagePair,
+                onTargetLanguageChange = onTargetLanguageChange,
+            )
+        }
+
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "What's going on?",
+                text = stringResource(R.string.home_whats_going_on),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Describe a real-life situation to study it.",
+                text = stringResource(R.string.home_describe_situation),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -219,7 +240,7 @@ private fun MainSection(
             OutlinedTextField(
                 value = situation,
                 onValueChange = onSituationChange,
-                placeholder = { Text("IRL situation", style = MaterialTheme.typography.headlineSmall) },
+                placeholder = { Text(stringResource(R.string.home_irl_situation_placeholder), style = MaterialTheme.typography.headlineSmall) },
                 textStyle = MaterialTheme.typography.headlineSmall,
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -242,7 +263,11 @@ private fun MainSection(
             ) {
                 Icon(
                     imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
-                    contentDescription = if (isListening) "Stop voice input" else "Voice input",
+                    contentDescription = if (isListening) {
+                        stringResource(R.string.home_stop_voice_input)
+                    } else {
+                        stringResource(R.string.home_voice_input)
+                    },
                     tint = if (isListening) {
                         MaterialTheme.colorScheme.error
                     } else {
@@ -255,9 +280,11 @@ private fun MainSection(
         Button(
             onClick = { onStudy(situation.text) },
             enabled = situation.text.isNotBlank() && !state.isGenerating,
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .fillMaxWidth(),
         ) {
             if (state.isGenerating) {
                 CircularProgressIndicator(
@@ -267,9 +294,9 @@ private fun MainSection(
                     strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
-                Text("Generating…", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.home_generating), style = MaterialTheme.typography.titleMedium)
             } else {
-                Text("Study", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.home_study_this), style = MaterialTheme.typography.titleMedium)
             }
         }
 
@@ -295,6 +322,73 @@ private fun MainSection(
     }
 }
 
+/**
+ * The button at the top of the home screen that shows which language the learner is currently
+ * studying and lets them switch the target language. The source language (the one the learner
+ * already knows) is chosen in settings, so it is excluded from the choices here.
+ */
+@Composable
+private fun TargetLanguageButton(
+    languagePair: LanguagePair,
+    onTargetLanguageChange: (Language) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { expanded = true },
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.home_learning),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Text(
+                    text = "${languagePair.target.flag} ${languagePair.target.displayName}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = stringResource(R.string.home_change_language),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Language.entries.forEach { language ->
+                if (language != languagePair.source) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = "${language.flag} ${language.displayName}",
+                                fontWeight = if (language == languagePair.target) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Normal
+                                },
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            if (language != languagePair.target) onTargetLanguageChange(language)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PreviousSessionsSection(
     state: HomeUiState,
@@ -311,23 +405,27 @@ private fun PreviousSessionsSection(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (state.history.isNotEmpty()) {
-                Text(
-                    text = "Previous sessions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
+            Text(
+                text = stringResource(R.string.home_previous_sessions),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
             IconButton(onClick = onOpenSettings) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.settings),
                 )
             }
+        }
+
+        if (state.history.isEmpty()) {
+            Text(
+                text = stringResource(R.string.home_no_sessions),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (state.history.isNotEmpty()) {
@@ -361,19 +459,19 @@ private fun HistoryRow(item: SituationEntity, onClick: () -> Unit, onLongClick: 
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete session?") },
-            text = { Text("This will remove \"${item.title.ifBlank { item.situation }}\" permanently.") },
+            title = { Text(stringResource(R.string.home_delete_session_title)) },
+            text = { Text(stringResource(R.string.home_delete_session_message, item.title.ifBlank { item.situation })) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
                     onLongClick()
                 }) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )

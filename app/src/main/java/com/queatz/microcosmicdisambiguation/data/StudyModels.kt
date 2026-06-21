@@ -1,6 +1,7 @@
 package com.queatz.microcosmicdisambiguation.data
 
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -21,9 +22,9 @@ import kotlinx.serialization.json.buildJsonArray
  */
 @Serializable
 data class StudyWord(
-    val hanzi: String = "",
-    val pinyin: String = "",
-    val english: String = "",
+    @SerialName("text") val hanzi: String = "",
+    @SerialName("romanization") val pinyin: String = "",
+    @SerialName("translation") val english: String = "",
     val emoji: String = "",
 )
 
@@ -43,9 +44,9 @@ data class StudyWord(
  */
 @Serializable
 data class WordBreakdown(
-    val hanzi: String = "",
-    val pinyin: String = "",
-    val english: String = "",
+    @SerialName("text") val hanzi: String = "",
+    @SerialName("romanization") val pinyin: String = "",
+    @SerialName("translation") val english: String = "",
     val emoji: String = "",
     val explanation: String = "",
     val punctuation: Boolean = false,
@@ -63,8 +64,8 @@ data class WordBreakdown(
  */
 @Serializable
 data class Alignment(
-    val zh: String = "",
-    val en: String = "",
+    @SerialName("target") val zh: String = "",
+    @SerialName("source") val en: String = "",
     val punctuation: Boolean = false,
 )
 
@@ -85,7 +86,7 @@ data class Alignment(
 @Serializable
 data class SentenceStructure(
     val template: String = "",
-    val english: String = "",
+    @SerialName("translation") val english: String = "",
     @Serializable(with = StudyWordListSerializer::class)
     val words: List<StudyWord> = emptyList(),
     @Serializable(with = WordBreakdownListSerializer::class)
@@ -110,7 +111,7 @@ data class SentenceStructure(
  */
 private fun normalizeObjectList(element: JsonElement): JsonArray = when (element) {
     is JsonArray -> buildJsonArray { element.forEach { add(normalizeItem(it)) } }
-    is JsonObject -> if (element.containsKey("hanzi")) {
+    is JsonObject -> if (element.containsKey("text")) {
         // a single item object, not a map of items
         buildJsonArray { add(element) }
     } else {
@@ -127,7 +128,7 @@ private fun normalizeObjectList(element: JsonElement): JsonArray = when (element
  */
 private fun normalizeAlignmentList(element: JsonElement): JsonArray = when (element) {
     is JsonArray -> buildJsonArray { element.forEach { if (it is JsonObject) add(it) } }
-    is JsonObject -> if (element.containsKey("zh") || element.containsKey("en")) {
+    is JsonObject -> if (element.containsKey("target") || element.containsKey("source")) {
         // a single alignment object, not a map of items
         buildJsonArray { add(element) }
     } else {
@@ -137,10 +138,10 @@ private fun normalizeAlignmentList(element: JsonElement): JsonArray = when (elem
     else -> buildJsonArray { }
 }
 
-/** Normalizes a single list element to an object, turning a bare string into `{ "hanzi": ... }`. */
+/** Normalizes a single list element to an object, turning a bare string into `{ "text": ... }`. */
 private fun normalizeItem(element: JsonElement): JsonElement = when (element) {
     is JsonObject -> element
-    is JsonPrimitive -> JsonObject(mapOf("hanzi" to element))
+    is JsonPrimitive -> JsonObject(mapOf("text" to element))
     else -> JsonObject(emptyMap())
 }
 
@@ -179,7 +180,7 @@ object TokenListSerializer :
 
     private fun normalizeToken(element: JsonElement): JsonElement = when (element) {
         is JsonPrimitive -> element
-        is JsonObject -> element["text"] ?: element["hanzi"] ?: JsonPrimitive("")
+        is JsonObject -> element["text"] ?: element["hanzi"] ?: element["word"] ?: JsonPrimitive("")
         else -> JsonPrimitive("")
     }
 }

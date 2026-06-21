@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">返回</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="close">关闭</string>
+    <string name="next">下一步</string>
+    <string name="stop">停止</string>
+    <string name="finish">完成</string>
+    <string name="settings">设置</string>
+    <string name="recordings">录音</string>
+    <string name="try_again">重试</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">发生了什么？</string>
+    <string name="home_describe_situation">描述一个真实的情境来学习它。</string>
+    <string name="home_irl_situation_placeholder">真实情境</string>
+    <string name="home_voice_input">语音输入</string>
+    <string name="home_stop_voice_input">停止语音输入</string>
+    <string name="home_generating">正在生成…</string>
+    <string name="home_study_this">学习这个</string>
+    <string name="home_learning">我正在学习</string>
+    <string name="home_change_language">切换语言</string>
+    <string name="home_previous_sessions">以往的学习</string>
+    <string name="home_no_sessions">还没有学习记录。在上方的框中描述一个真实情境即可开始学习——你的学习记录会显示在这里。</string>
+    <string name="home_delete_session_title">删除这次学习？</string>
+    <string name="home_delete_session_message">这将永久删除 \"%1$s\"。</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">你的语言</string>
+    <string name="settings_i_speak">我会说</string>
+    <string name="settings_tts_engine">文字转语音引擎</string>
+    <string name="settings_tts_ai_title">AI（Qwen）</string>
+    <string name="settings_tts_ai_description">自然的母语者声音。需要联网。</string>
+    <string name="settings_tts_system_title">系统</string>
+    <string name="settings_tts_system_description">使用设备内置的文字转语音引擎。可离线使用。</string>
+    <string name="settings_review_recordings">查看录音</string>
+    <string name="settings_review_recordings_description">收听你保存的语音录音及其转写。</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">还没有录音。口述一个真实情境即可录制一段。</string>
+    <string name="recordings_delete_title">删除录音？</string>
+    <string name="recordings_delete_message">这将永久删除音频及其转写。</string>
+    <string name="recordings_play">播放录音</string>
+    <string name="recordings_no_transcription">（无转写）</string>
+    <string name="recordings_subtitle">%1$s · %2$.1f秒</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">没有可学习的内容。</string>
+    <string name="study_try_mission">尝试一个真实任务</string>
+    <string name="study_words">词语</string>
+    <string name="study_breakdown">详解</string>
+    <string name="study_play_sentence">播放句子</string>
+    <string name="study_word_by_word">逐词播放</string>
+    <string name="study_next_word">下一个词</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">正在构建你的任务…</string>
+    <string name="mission_building_subtitle">用你所学的知识去应对真实情境。</string>
+    <string name="mission_build_failed">无法构建任务</string>
+    <string name="mission_none_available">没有可用的任务。</string>
+    <string name="mission_header">任务 %1$d / %2$d · %3$s</string>
+    <string name="mission_talking_to">你正在和 %1$s 交谈。</string>
+    <string name="mission_default_success">很好——成功了！对方听懂了你的话，对话继续。</string>
+    <string name="mission_pick_what_to_say">选择你要说的话。</string>
+    <string name="mission_next">下一个任务</string>
+    <string name="mission_continue">继续</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">%1$s语音不可用</string>
+    <string name="tts_missing_data_message">要朗读句子，需要先下载 %1$s 的语音数据。</string>
+    <string name="tts_not_supported_message">你的文字转语音引擎不支持 %1$s。请打开设置安装，或切换到支持的引擎。</string>
+    <string name="tts_download">下载</string>
+    <string name="tts_open_settings">打开设置</string>
+    <string name="tts_not_now">暂不</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">生成学习指南失败</string>
+    <string name="error_generate_missions">生成任务失败</string>
+    <string name="error_session_not_found">未找到该学习记录</string>
+</resources>

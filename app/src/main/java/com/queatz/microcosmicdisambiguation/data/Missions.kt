@@ -1,5 +1,6 @@
 package com.queatz.microcosmicdisambiguation.data
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
@@ -20,9 +21,9 @@ import kotlinx.serialization.json.buildJsonArray
  */
 @Serializable
 data class MissionChoice(
-    val hanzi: String = "",
-    val pinyin: String = "",
-    val english: String = "",
+    @SerialName("text") val hanzi: String = "",
+    @SerialName("romanization") val pinyin: String = "",
+    @SerialName("translation") val english: String = "",
     val correct: Boolean = false,
     val reply: String = "",
 )
@@ -42,8 +43,8 @@ data class MissionChoice(
 @Serializable
 data class MissionTurn(
     val speaker: String = "",
-    val speakerPinyin: String = "",
-    val speakerEnglish: String = "",
+    @SerialName("speakerRomanization") val speakerPinyin: String = "",
+    @SerialName("speakerTranslation") val speakerEnglish: String = "",
     val emoji: String = "",
     val prompt: String = "",
     @Serializable(with = MissionChoiceListSerializer::class)

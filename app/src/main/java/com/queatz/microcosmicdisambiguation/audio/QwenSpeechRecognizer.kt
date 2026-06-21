@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class QwenSpeechRecognizer(
     private val apiKey: String = QwenService.QWEN_API_KEY,
+    /** `language_hints` codes biasing recognition toward the languages the learner dictates in. */
+    private val languageHints: List<String> = emptyList(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -289,6 +291,7 @@ class QwenSpeechRecognizer(
                 parameters = AsrParameters(
                     format = "pcm",
                     sampleRate = SAMPLE_RATE,
+                    languageHints = languageHints.takeIf { it.isNotEmpty() },
                 ),
                 input = AsrInput(),
             ),

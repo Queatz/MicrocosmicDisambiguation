@@ -46,9 +46,43 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "2:4894552488334149327",
+      "lastPropertyId": "5:5224280255057390146",
+      "name": "RecordingEntity",
+      "properties": [
+        {
+          "id": "1:3527608009598490228",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:262887667846797816",
+          "name": "filePath",
+          "type": 9
+        },
+        {
+          "id": "3:7972771927018272771",
+          "name": "transcription",
+          "type": 9
+        },
+        {
+          "id": "4:8679258128307051980",
+          "name": "createdAt",
+          "type": 6
+        },
+        {
+          "id": "5:5224280255057390146",
+          "name": "durationMs",
+          "type": 6
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "1:949373012597390392",
+  "lastEntityId": "2:4894552488334149327",
   "lastIndexId": "0:0",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",

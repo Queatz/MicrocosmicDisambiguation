@@ -34,7 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.queatz.microcosmicdisambiguation.R
 import com.queatz.microcosmicdisambiguation.data.RecordingEntity
 import java.text.DateFormat
 import java.util.Date
@@ -79,11 +81,11 @@ fun RecordingsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                 )
             }
             Text(
-                text = "Recordings",
+                text = stringResource(R.string.recordings),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -91,7 +93,7 @@ fun RecordingsScreen(
 
         if (recordings.isEmpty()) {
             Text(
-                text = "No recordings yet. Dictate an IRL situation to capture one.",
+                text = stringResource(R.string.recordings_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -125,19 +127,19 @@ private fun RecordingRow(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete recording?") },
-            text = { Text("This will remove the audio and its transcription permanently.") },
+            title = { Text(stringResource(R.string.recordings_delete_title)) },
+            text = { Text(stringResource(R.string.recordings_delete_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
                     onDelete()
                 }) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )
@@ -166,17 +168,22 @@ private fun RecordingRow(
         ) {
             Icon(
                 imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Play recording",
+                contentDescription = stringResource(R.string.recordings_play),
                 tint = MaterialTheme.colorScheme.primary,
             )
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = recording.transcription.ifBlank { "(no transcription)" },
+                    text = recording.transcription.ifBlank { stringResource(R.string.recordings_no_transcription) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = subtitle(recording),
+                    text = stringResource(
+                        R.string.recordings_subtitle,
+                        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                            .format(Date(recording.createdAt)),
+                        recording.durationMs / 1000.0,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -185,9 +192,3 @@ private fun RecordingRow(
     }
 }
 
-private fun subtitle(recording: RecordingEntity): String {
-    val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-        .format(Date(recording.createdAt))
-    val seconds = (recording.durationMs / 1000.0)
-    return "%s · %.1fs".format(date, seconds)
-}

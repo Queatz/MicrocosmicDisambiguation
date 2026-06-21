@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">Quay lại</string>
+    <string name="cancel">Hủy</string>
+    <string name="delete">Xóa</string>
+    <string name="close">Đóng</string>
+    <string name="next">Tiếp theo</string>
+    <string name="stop">Dừng</string>
+    <string name="finish">Hoàn thành</string>
+    <string name="settings">Cài đặt</string>
+    <string name="recordings">Bản ghi âm</string>
+    <string name="try_again">Thử lại</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">Chuyện gì đang xảy ra?</string>
+    <string name="home_describe_situation">Mô tả một tình huống thực tế để học nó.</string>
+    <string name="home_irl_situation_placeholder">Tình huống thực tế</string>
+    <string name="home_voice_input">Nhập bằng giọng nói</string>
+    <string name="home_stop_voice_input">Dừng nhập bằng giọng nói</string>
+    <string name="home_generating">Đang tạo…</string>
+    <string name="home_study_this">Học cái này</string>
+    <string name="home_learning">Tôi đang học</string>
+    <string name="home_change_language">Đổi ngôn ngữ</string>
+    <string name="home_previous_sessions">Các buổi học trước</string>
+    <string name="home_no_sessions">Chưa có buổi học nào. Hãy mô tả một tình huống thực tế vào ô phía trên để bắt đầu học — các buổi học của bạn sẽ hiện ở đây.</string>
+    <string name="home_delete_session_title">Xóa buổi học?</string>
+    <string name="home_delete_session_message">Thao tác này sẽ xóa vĩnh viễn \"%1$s\".</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">Ngôn ngữ của bạn</string>
+    <string name="settings_i_speak">Tôi nói</string>
+    <string name="settings_tts_engine">Bộ chuyển văn bản thành giọng nói</string>
+    <string name="settings_tts_ai_title">AI (Qwen)</string>
+    <string name="settings_tts_ai_description">Giọng nói tự nhiên của người bản xứ. Cần kết nối internet.</string>
+    <string name="settings_tts_system_title">Hệ thống</string>
+    <string name="settings_tts_system_description">Sử dụng bộ chuyển văn bản thành giọng nói tích hợp sẵn của thiết bị. Hoạt động ngoại tuyến.</string>
+    <string name="settings_review_recordings">Xem lại bản ghi âm</string>
+    <string name="settings_review_recordings_description">Nghe lại các bản ghi âm đã lưu và phần phiên âm của chúng.</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">Chưa có bản ghi âm nào. Hãy đọc một tình huống thực tế để tạo một bản.</string>
+    <string name="recordings_delete_title">Xóa bản ghi âm?</string>
+    <string name="recordings_delete_message">Thao tác này sẽ xóa vĩnh viễn âm thanh và phần phiên âm của nó.</string>
+    <string name="recordings_play">Phát bản ghi âm</string>
+    <string name="recordings_no_transcription">(không có phiên âm)</string>
+    <string name="recordings_subtitle">%1$s · %2$.1fs</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">Không có nội dung học.</string>
+    <string name="study_try_mission">Thử một nhiệm vụ thực tế</string>
+    <string name="study_words">Từ vựng</string>
+    <string name="study_breakdown">Phân tích</string>
+    <string name="study_play_sentence">Phát câu</string>
+    <string name="study_word_by_word">Từng từ một</string>
+    <string name="study_next_word">Từ tiếp theo</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">Đang tạo nhiệm vụ cho bạn…</string>
+    <string name="mission_building_subtitle">Các tình huống thực tế bạn có thể vượt qua bằng những gì đã học.</string>
+    <string name="mission_build_failed">Không thể tạo nhiệm vụ</string>
+    <string name="mission_none_available">Không có nhiệm vụ nào.</string>
+    <string name="mission_header">Nhiệm vụ %1$d / %2$d · %3$s</string>
+    <string name="mission_talking_to">Bạn đang nói chuyện với %1$s.</string>
+    <string name="mission_default_success">Tuyệt — thành công rồi! Họ đã hiểu bạn và cuộc trò chuyện tiếp tục.</string>
+    <string name="mission_pick_what_to_say">Chọn điều bạn muốn nói.</string>
+    <string name="mission_next">Nhiệm vụ tiếp theo</string>
+    <string name="mission_continue">Tiếp tục</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">Giọng nói %1$s không khả dụng</string>
+    <string name="tts_missing_data_message">Để nghe đọc câu, cần tải xuống dữ liệu giọng nói %1$s.</string>
+    <string name="tts_not_supported_message">Bộ chuyển văn bản thành giọng nói của bạn không hỗ trợ %1$s. Hãy mở cài đặt để cài đặt hoặc chuyển sang bộ máy có hỗ trợ.</string>
+    <string name="tts_download">Tải xuống</string>
+    <string name="tts_open_settings">Mở cài đặt</string>
+    <string name="tts_not_now">Để sau</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">Không tạo được hướng dẫn học</string>
+    <string name="error_generate_missions">Không tạo được nhiệm vụ</string>
+    <string name="error_session_not_found">Không tìm thấy buổi học</string>
+</resources>

@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">နောက်သို့</string>
+    <string name="cancel">မလုပ်တော့ပါ</string>
+    <string name="delete">ဖျက်ရန်</string>
+    <string name="close">ပိတ်ရန်</string>
+    <string name="next">ရှေ့သို့</string>
+    <string name="stop">ရပ်ရန်</string>
+    <string name="finish">ပြီးပါပြီ</string>
+    <string name="settings">ဆက်တင်များ</string>
+    <string name="recordings">အသံဖမ်းချက်များ</string>
+    <string name="try_again">ထပ်ကြိုးစားရန်</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">ဘာဖြစ်နေတာလဲ။</string>
+    <string name="home_describe_situation">လေ့လာရန် တကယ့်အခြေအနေတစ်ခုကို ဖော်ပြပါ။</string>
+    <string name="home_irl_situation_placeholder">တကယ့်အခြေအနေ</string>
+    <string name="home_voice_input">အသံဖြင့်ထည့်သွင်းရန်</string>
+    <string name="home_stop_voice_input">အသံဖြင့်ထည့်သွင်းခြင်းကို ရပ်ရန်</string>
+    <string name="home_generating">ဖန်တီးနေသည်…</string>
+    <string name="home_study_this">ဒါကိုလေ့လာရန်</string>
+    <string name="home_learning">ကျွန်တော် လေ့လာနေပါတယ်</string>
+    <string name="home_change_language">ဘာသာစကားပြောင်းရန်</string>
+    <string name="home_previous_sessions">ယခင်လေ့လာမှုများ</string>
+    <string name="home_no_sessions">လေ့လာမှုများ မရှိသေးပါ။ စတင်လေ့လာရန် အပေါ်ကအကွက်တွင် တကယ့်အခြေအနေတစ်ခုကို ဖော်ပြပါ — သင့်လေ့လာမှုများ ဤနေရာတွင် ပေါ်လာပါမည်။</string>
+    <string name="home_delete_session_title">လေ့လာမှုကို ဖျက်မလား။</string>
+    <string name="home_delete_session_message">ဤသည်က \"%1$s\" ကို အပြီးအပိုင်ဖျက်ပစ်ပါမည်။</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">သင့်ဘာသာစကား</string>
+    <string name="settings_i_speak">ကျွန်ုပ်ပြောတတ်သည်</string>
+    <string name="settings_tts_engine">စာသားမှအသံပြောင်းသည့်အင်ဂျင်</string>
+    <string name="settings_tts_ai_title">AI (Qwen)</string>
+    <string name="settings_tts_ai_description">သဘာဝကျသော မိခင်ဘာသာစကားပြောသူ၏အသံ။ အင်တာနက်ချိတ်ဆက်မှု လိုအပ်သည်။</string>
+    <string name="settings_tts_system_title">စနစ်</string>
+    <string name="settings_tts_system_description">သင့်စက်တွင်ပါဝင်သော စာသားမှအသံပြောင်းသည့်အင်ဂျင်ကို အသုံးပြုသည်။ အော့ဖ်လိုင်းတွင် အလုပ်လုပ်သည်။</string>
+    <string name="settings_review_recordings">အသံဖမ်းချက်များ ပြန်ကြည့်ရန်</string>
+    <string name="settings_review_recordings_description">သိမ်းဆည်းထားသော အသံဖမ်းချက်များနှင့် ၎င်းတို့၏ စာသားပြောင်းချက်များကို နားထောင်ပါ။</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">အသံဖမ်းချက်များ မရှိသေးပါ။ တစ်ခုဖမ်းယူရန် တကယ့်အခြေအနေတစ်ခုကို ပြောပါ။</string>
+    <string name="recordings_delete_title">အသံဖမ်းချက်ကို ဖျက်မလား။</string>
+    <string name="recordings_delete_message">ဤသည်က အသံနှင့် ၎င်း၏စာသားပြောင်းချက်ကို အပြီးအပိုင်ဖျက်ပစ်ပါမည်။</string>
+    <string name="recordings_play">အသံဖမ်းချက်ကို ဖွင့်ရန်</string>
+    <string name="recordings_no_transcription">(စာသားပြောင်းချက်မရှိ)</string>
+    <string name="recordings_subtitle">%1$s · %2$.1fစက္ကန့်</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">လေ့လာစရာ အကြောင်းအရာ မရှိပါ။</string>
+    <string name="study_try_mission">တကယ့်တာဝန်တစ်ခု စမ်းကြည့်ရန်</string>
+    <string name="study_words">စကားလုံးများ</string>
+    <string name="study_breakdown">အသေးစိတ်ရှင်းလင်းချက်</string>
+    <string name="study_play_sentence">ဝါကျကို ဖွင့်ရန်</string>
+    <string name="study_word_by_word">တစ်လုံးချင်း</string>
+    <string name="study_next_word">နောက်စကားလုံး</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">သင့်တာဝန်များကို ဖန်တီးနေသည်…</string>
+    <string name="mission_building_subtitle">သင်လေ့လာထားသည်များဖြင့် ဖြတ်သန်းနိုင်သော တကယ့်အခြေအနေများ။</string>
+    <string name="mission_build_failed">တာဝန်များ ဖန်တီး၍မရပါ</string>
+    <string name="mission_none_available">ရရှိနိုင်သော တာဝန်မရှိပါ။</string>
+    <string name="mission_header">တာဝန် %1$d / %2$d · %3$s</string>
+    <string name="mission_talking_to">သင်သည် %1$s နှင့် စကားပြောနေသည်။</string>
+    <string name="mission_default_success">ကောင်းပါပြီ — အောင်မြင်ပါပြီ！ သူတို့ နားလည်သွားပြီး စကားဝိုင်း ဆက်လက်သွားပါသည်။</string>
+    <string name="mission_pick_what_to_say">ဘာပြောမည်ကို ရွေးပါ။</string>
+    <string name="mission_next">နောက်တာဝန်</string>
+    <string name="mission_continue">ဆက်လုပ်ရန်</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">%1$s အသံ မရရှိနိုင်ပါ</string>
+    <string name="tts_missing_data_message">ဝါကျများကို အသံထွက်ဖတ်ကြားရန် %1$s အသံဒေတာကို ဒေါင်းလုဒ်လုပ်ရန် လိုအပ်သည်။</string>
+    <string name="tts_not_supported_message">သင့်စာသားမှအသံပြောင်းသည့်အင်ဂျင်သည် %1$s ကို မပံ့ပိုးပါ။ ဆက်တင်များကိုဖွင့်ပြီး ထည့်သွင်းပါ သို့မဟုတ် ပံ့ပိုးသည့်အင်ဂျင်တစ်ခုသို့ ပြောင်းပါ။</string>
+    <string name="tts_download">ဒေါင်းလုဒ်</string>
+    <string name="tts_open_settings">ဆက်တင်များဖွင့်ရန်</string>
+    <string name="tts_not_now">ယခုမဟုတ်ပါ</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">လေ့လာရေးလမ်းညွှန် ဖန်တီး၍မရပါ</string>
+    <string name="error_generate_missions">တာဝန်များ ဖန်တီး၍မရပါ</string>
+    <string name="error_session_not_found">လေ့လာမှုကို ရှာမတွေ့ပါ</string>
+</resources>

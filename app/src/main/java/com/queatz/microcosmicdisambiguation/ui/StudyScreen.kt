@@ -56,9 +56,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.queatz.microcosmicdisambiguation.R
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.Alignment as AlignmentChunk
 import com.queatz.microcosmicdisambiguation.data.alignedEnglishRange
@@ -81,7 +83,7 @@ fun StudyScreen(
 ) {
     if (guide.structures.isEmpty()) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No study content available.")
+            Text(stringResource(R.string.study_no_content))
         }
         return
     }
@@ -116,20 +118,20 @@ fun StudyScreen(
                 onClick = onStartMissions,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Try a real-life mission")
+                Text(stringResource(R.string.study_try_mission))
             }
             OutlinedButton(
                 onClick = onClose,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Close")
+                Text(stringResource(R.string.close))
             }
         } else {
             Button(
                 onClick = { page++ },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Next")
+                Text(stringResource(R.string.next))
             }
         }
     }
@@ -395,7 +397,7 @@ private fun SentencePage(
             )
 
             Text(
-                text = "Words",
+                text = stringResource(R.string.study_words),
                 style = MaterialTheme.typography.titleMedium,
             )
             // LookaheadScope lets the remaining chips animate smoothly into place when a word is
@@ -430,7 +432,7 @@ private fun SentencePage(
             // Punctuation-only entries are skipped so only real words get a row.
             if (structure.breakdown.any { !it.punctuation }) {
                 Text(
-                    text = "Breakdown",
+                    text = stringResource(R.string.study_breakdown),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Column(
@@ -496,14 +498,14 @@ private fun PlayControls(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(onClick = onPlaySentence, modifier = Modifier.weight(1f)) {
-                Text("Play sentence")
+                Text(stringResource(R.string.study_play_sentence))
             }
             OutlinedButton(
                 onClick = onStartWordByWord,
                 enabled = wordCount > 0,
                 modifier = Modifier.weight(1f),
             ) {
-                Text("Word by word")
+                Text(stringResource(R.string.study_word_by_word))
             }
         }
     } else {
@@ -514,10 +516,10 @@ private fun PlayControls(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedButton(onClick = onStopWordByWord, modifier = Modifier.weight(1f)) {
-                    Text("Stop")
+                    Text(stringResource(R.string.stop))
                 }
                 Button(onClick = onNextWord, modifier = Modifier.weight(1f)) {
-                    Text(if (isLastWord) "Finish" else "Next word")
+                    Text(if (isLastWord) stringResource(R.string.finish) else stringResource(R.string.study_next_word))
                 }
             }
         }

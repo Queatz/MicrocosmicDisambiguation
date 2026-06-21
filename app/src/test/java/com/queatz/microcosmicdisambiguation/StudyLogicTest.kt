@@ -91,14 +91,14 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
+                  "translation": "I want to buy ___.",
                   "words": [
-                    { "hanzi": "苹果", "pinyin": "píngguǒ", "english": "apple", "emoji": "🍎" }
+                    { "text": "苹果", "romanization": "píngguǒ", "translation": "apple", "emoji": "🍎" }
                   ],
                   "breakdown": [
-                    { "hanzi": "我", "pinyin": "wǒ", "english": "I", "emoji": "🙋", "explanation": "The speaker." },
-                    { "hanzi": "想", "pinyin": "xiǎng", "english": "want", "emoji": "💭", "explanation": "Expresses a wish." },
-                    { "hanzi": "买", "pinyin": "mǎi", "english": "buy", "emoji": "🛒", "explanation": "The action of purchasing." }
+                    { "text": "我", "romanization": "wǒ", "translation": "I", "emoji": "🙋", "explanation": "The speaker." },
+                    { "text": "想", "romanization": "xiǎng", "translation": "want", "emoji": "💭", "explanation": "Expresses a wish." },
+                    { "text": "买", "romanization": "mǎi", "translation": "buy", "emoji": "🛒", "explanation": "The action of purchasing." }
                   ]
                 }
               ]
@@ -150,10 +150,10 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
+                  "translation": "I want to buy ___.",
                   "words": {
-                    "1": { "hanzi": "苹果", "pinyin": "píngguǒ", "english": "apple", "emoji": "🍎" },
-                    "2": { "hanzi": "水", "pinyin": "shuǐ", "english": "water", "emoji": "💧" }
+                    "1": { "text": "苹果", "romanization": "píngguǒ", "translation": "apple", "emoji": "🍎" },
+                    "2": { "text": "水", "romanization": "shuǐ", "translation": "water", "emoji": "💧" }
                   }
                 }
               ]
@@ -177,8 +177,8 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
-                  "words": { "hanzi": "苹果", "pinyin": "píngguǒ", "english": "apple", "emoji": "🍎" }
+                  "translation": "I want to buy ___.",
+                  "words": { "text": "苹果", "romanization": "píngguǒ", "translation": "apple", "emoji": "🍎" }
                 }
               ]
             }
@@ -200,7 +200,7 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
+                  "translation": "I want to buy ___.",
                   "words": ["苹果", "水"]
                 }
               ]
@@ -222,13 +222,13 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
+                  "translation": "I want to buy ___.",
                   "alignment": [
-                    { "zh": "我", "en": "I", "punctuation": false },
-                    { "zh": "想", "en": " want", "punctuation": false },
-                    { "zh": "买", "en": " to buy", "punctuation": false },
-                    { "zh": "苹果", "en": " apple", "punctuation": false },
-                    { "zh": "。", "en": ".", "punctuation": true }
+                    { "target": "我", "source": "I", "punctuation": false },
+                    { "target": "想", "source": " want", "punctuation": false },
+                    { "target": "买", "source": " to buy", "punctuation": false },
+                    { "target": "苹果", "source": " apple", "punctuation": false },
+                    { "target": "。", "source": ".", "punctuation": true }
                   ]
                 }
               ]
@@ -258,11 +258,11 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我好。",
-                  "english": "I am good.",
+                  "translation": "I am good.",
                   "alignment": {
-                    "1": { "zh": "我", "en": "I am" },
-                    "2": { "zh": "好", "en": " good" },
-                    "3": { "zh": "。", "en": ".", "punctuation": true }
+                    "1": { "target": "我", "source": "I am" },
+                    "2": { "target": "好", "source": " good" },
+                    "3": { "target": "。", "source": ".", "punctuation": true }
                   }
                 }
               ]
@@ -286,10 +286,10 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我好___",
-                  "english": "I am ___",
+                  "translation": "I am ___",
                   "breakdown": [
-                    { "hanzi": "我", "pinyin": "wǒ", "english": "I", "emoji": "🙋", "explanation": "speaker" },
-                    { "hanzi": "。", "pinyin": "", "english": "", "emoji": "", "explanation": "", "punctuation": true }
+                    { "text": "我", "romanization": "wǒ", "translation": "I", "emoji": "🙋", "explanation": "speaker" },
+                    { "text": "。", "romanization": "", "translation": "", "emoji": "", "explanation": "", "punctuation": true }
                   ]
                 }
               ]
@@ -390,9 +390,9 @@ class StudyLogicTest {
               "structures": [
                 {
                   "template": "我想买___。",
-                  "english": "I want to buy ___.",
+                  "translation": "I want to buy ___.",
                   "words": [
-                    { "hanzi": "苹果", "pinyin": "píngguǒ", "english": "apple", "emoji": "🍎" }
+                    { "text": "苹果", "romanization": "píngguǒ", "translation": "apple", "emoji": "🍎" }
                   ],
                   "breakdown": [],
                   "tokens": ["我", "想", "买", "苹果", "。"]

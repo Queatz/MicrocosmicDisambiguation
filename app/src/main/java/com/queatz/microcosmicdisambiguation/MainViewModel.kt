@@ -7,6 +7,8 @@ import com.queatz.microcosmicdisambiguation.ai.QwenService
 import com.queatz.microcosmicdisambiguation.data.MissionSet
 import com.queatz.microcosmicdisambiguation.data.RecordingEntity
 import com.queatz.microcosmicdisambiguation.data.RecordingRepository
+import com.queatz.microcosmicdisambiguation.data.Language
+import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.SettingsRepository
 import com.queatz.microcosmicdisambiguation.data.SituationEntity
 import com.queatz.microcosmicdisambiguation.data.SituationRepository
@@ -26,6 +28,7 @@ data class HomeUiState(
     val error: String? = null,
     val generatedSessionId: Long? = null,
     val ttsMode: TtsMode = TtsMode.System,
+    val languagePair: LanguagePair = LanguagePair.Default,
 )
 
 /**
@@ -53,7 +56,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val qwenService = QwenService()
     private val qwen = qwenService
 
-    private val _uiState = MutableStateFlow(HomeUiState(ttsMode = settings.ttsMode))
+    private val _uiState = MutableStateFlow(
+        HomeUiState(ttsMode = settings.ttsMode, languagePair = settings.languagePair),
+    )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     private val _missionState = MutableStateFlow(MissionUiState())
@@ -72,6 +77,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         settings.ttsMode = mode
         _uiState.update { it.copy(ttsMode = mode) }
     }
+
+    /** Persists the source language (the one the learner knows), chosen in settings. */
+    fun setSourceLanguage(language: Language) {
+        settings.sourceLanguage = language
+        _uiState.update { it.copy(languagePair = settings.languagePair) }
+    }
+
+    /** Persists the target language (the one being studied), chosen from the home screen. */
+    fun setTargetLanguage(language: Language) {
+        settings.targetLanguage = language
+        _uiState.update { it.copy(languagePair = settings.languagePair) }
+    }
+
+    /** Swaps the source and target languages. */
+    fun swapLanguages() {
+        settings.languagePair = settings.languagePair.swapped()
+        _uiState.update { it.copy(languagePair = settings.languagePair) }
+    }
+
+    /** The [LanguagePair] a stored session was generated for (its own languages, not the current selection). */
+    fun languagePairOf(id: Long): LanguagePair =
+        repository.get(id)?.let { repository.languagePairOf(it) } ?: _uiState.value.languagePair
 
     private fun refreshHistory() {
         _uiState.update { it.copy(history = repository.all()) }
@@ -106,16 +133,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val trimmed = situation.trim()
         if (trimmed.isEmpty() || _uiState.value.isGenerating) return
 
+        val languages = _uiState.value.languagePair
         _uiState.update { it.copy(isGenerating = true, error = null) }
         viewModelScope.launch {
             try {
-                val guide = withContext(Dispatchers.IO) { qwen.generateStudyGuide(trimmed) }
-                val id = withContext(Dispatchers.IO) { repository.save(trimmed, guide) }
+                val guide = withContext(Dispatchers.IO) { qwen.generateStudyGuide(trimmed, languages) }
+                val id = withContext(Dispatchers.IO) { repository.save(trimmed, guide, languages) }
                 refreshHistory()
                 _uiState.update { it.copy(isGenerating = false, generatedSessionId = id) }
             } catch (t: Throwable) {
                 _uiState.update {
-                    it.copy(isGenerating = false, error = t.message ?: "Failed to generate study guide")
+                    it.copy(
+                        isGenerating = false,
+                        error = t.message ?: getApplication<Application>().getString(R.string.error_generate_study_guide),
+                    )
                 }
             }
         }
@@ -154,7 +185,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val entity = repository.get(id)
         if (entity == null) {
-            _missionState.value = MissionUiState(sessionId = id, error = "Session not found")
+            _missionState.value = MissionUiState(
+                sessionId = id,
+                error = getApplication<Application>().getString(R.string.error_session_not_found),
+            )
             return
         }
 
@@ -165,10 +199,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _missionState.value = MissionUiState(sessionId = id, isGenerating = true)
+        val languages = repository.languagePairOf(entity)
         viewModelScope.launch {
             try {
                 val guide = repository.guideOf(entity)
-                val missions = withContext(Dispatchers.IO) { qwen.generateMissions(guide) }
+                val missions = withContext(Dispatchers.IO) { qwen.generateMissions(guide, languages) }
                 withContext(Dispatchers.IO) { repository.saveMissions(id, missions) }
                 _missionState.update {
                     if (it.sessionId == id) it.copy(isGenerating = false, missions = missions) else it
@@ -178,7 +213,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (it.sessionId == id) {
                         it.copy(
                             isGenerating = false,
-                            error = t.message ?: "Failed to generate missions",
+                            error = t.message
+                                ?: getApplication<Application>().getString(R.string.error_generate_missions),
                         )
                     } else {
                         it

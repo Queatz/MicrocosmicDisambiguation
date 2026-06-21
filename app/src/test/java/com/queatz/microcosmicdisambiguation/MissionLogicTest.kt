@@ -75,14 +75,14 @@ class MissionLogicTest {
                   "turns": [
                     {
                       "speaker": "您要点什么？",
-                      "speakerPinyin": "nín yào diǎn shénme?",
-                      "speakerEnglish": "What would you like to order?",
+                      "speakerRomanization": "nín yào diǎn shénme?",
+                      "speakerTranslation": "What would you like to order?",
                       "emoji": "🧑‍🍳",
                       "prompt": "Order a cup of tea.",
                       "choices": [
-                        { "hanzi": "我要一杯茶。", "pinyin": "wǒ yào yì bēi chá.", "english": "I'd like a cup of tea.", "correct": true, "reply": "Coming right up!" },
-                        { "hanzi": "厕所在哪里？", "pinyin": "cèsuǒ zài nǎlǐ?", "english": "Where's the toilet?", "correct": false, "reply": "That's not an order — they look confused." },
-                        { "hanzi": "多少钱？", "pinyin": "duōshǎo qián?", "english": "How much?", "correct": false, "reply": "They haven't told you the price yet." }
+                        { "text": "我要一杯茶。", "romanization": "wǒ yào yì bēi chá.", "translation": "I'd like a cup of tea.", "correct": true, "reply": "Coming right up!" },
+                        { "text": "厕所在哪里？", "romanization": "cèsuǒ zài nǎlǐ?", "translation": "Where's the toilet?", "correct": false, "reply": "That's not an order — they look confused." },
+                        { "text": "多少钱？", "romanization": "duōshǎo qián?", "translation": "How much?", "correct": false, "reply": "They haven't told you the price yet." }
                       ]
                     }
                   ],
@@ -130,8 +130,8 @@ class MissionLogicTest {
                     {
                       "speaker": "你好",
                       "choices": {
-                        "a": { "hanzi": "你好", "correct": true },
-                        "b": { "hanzi": "再见", "correct": false }
+                        "a": { "text": "你好", "correct": true },
+                        "b": { "text": "再见", "correct": false }
                       }
                     }
                   ]
@@ -156,7 +156,7 @@ class MissionLogicTest {
                 {
                   "title": "X",
                   "turns": [
-                    { "speaker": "你好", "choices": ["oops", { "hanzi": "你好", "correct": true }] }
+                    { "speaker": "你好", "choices": ["oops", { "text": "你好", "correct": true }] }
                   ]
                 }
               ]

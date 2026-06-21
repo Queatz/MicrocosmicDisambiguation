@@ -26,5 +26,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Microcosmic disambiguation"
+rootProject.name = "Microcosmic Disambiguation"
 include(":app")

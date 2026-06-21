@@ -20,4 +20,8 @@ data class SituationEntity(
     var guideJson: String = "",
     var createdAt: Long = 0,
     var missionJson: String? = "",
+    /** The [Language.name] the learner already knows for this session (its source language). */
+    var sourceLang: String = "",
+    /** The [Language.name] the learner is studying in this session (its target language). */
+    var targetLang: String = "",
 )

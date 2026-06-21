@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">뒤로</string>
+    <string name="cancel">취소</string>
+    <string name="delete">삭제</string>
+    <string name="close">닫기</string>
+    <string name="next">다음</string>
+    <string name="stop">정지</string>
+    <string name="finish">완료</string>
+    <string name="settings">설정</string>
+    <string name="recordings">녹음</string>
+    <string name="try_again">다시 시도</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">무슨 일인가요?</string>
+    <string name="home_describe_situation">실제 상황을 설명하여 학습해 보세요.</string>
+    <string name="home_irl_situation_placeholder">실제 상황</string>
+    <string name="home_voice_input">음성 입력</string>
+    <string name="home_stop_voice_input">음성 입력 중지</string>
+    <string name="home_generating">생성 중…</string>
+    <string name="home_study_this">이걸 학습하기</string>
+    <string name="home_learning">저는 배우고 있어요</string>
+    <string name="home_change_language">언어 변경</string>
+    <string name="home_previous_sessions">이전 학습</string>
+    <string name="home_no_sessions">아직 학습 기록이 없습니다. 위 입력란에 실제 상황을 설명하면 학습을 시작할 수 있어요 — 학습 기록이 여기에 표시됩니다.</string>
+    <string name="home_delete_session_title">학습을 삭제할까요?</string>
+    <string name="home_delete_session_message">\"%1$s\"이(가) 영구적으로 삭제됩니다.</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">내 언어</string>
+    <string name="settings_i_speak">사용하는 언어</string>
+    <string name="settings_tts_engine">텍스트 음성 변환 엔진</string>
+    <string name="settings_tts_ai_title">AI (Qwen)</string>
+    <string name="settings_tts_ai_description">자연스러운 원어민 음성입니다. 인터넷 연결이 필요합니다.</string>
+    <string name="settings_tts_system_title">시스템</string>
+    <string name="settings_tts_system_description">기기에 내장된 텍스트 음성 변환 엔진을 사용합니다. 오프라인에서도 작동합니다.</string>
+    <string name="settings_review_recordings">녹음 다시 보기</string>
+    <string name="settings_review_recordings_description">저장된 음성 녹음과 전사 내용을 들어보세요.</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">아직 녹음이 없습니다. 실제 상황을 말하면 녹음이 만들어집니다.</string>
+    <string name="recordings_delete_title">녹음을 삭제할까요?</string>
+    <string name="recordings_delete_message">오디오와 전사 내용이 영구적으로 삭제됩니다.</string>
+    <string name="recordings_play">녹음 재생</string>
+    <string name="recordings_no_transcription">(전사 없음)</string>
+    <string name="recordings_subtitle">%1$s · %2$.1f초</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">학습할 내용이 없습니다.</string>
+    <string name="study_try_mission">실제 미션 도전하기</string>
+    <string name="study_words">단어</string>
+    <string name="study_breakdown">분석</string>
+    <string name="study_play_sentence">문장 재생</string>
+    <string name="study_word_by_word">단어별 재생</string>
+    <string name="study_next_word">다음 단어</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">미션을 만드는 중…</string>
+    <string name="mission_building_subtitle">학습한 내용으로 헤쳐 나갈 수 있는 실제 상황입니다.</string>
+    <string name="mission_build_failed">미션을 만들 수 없습니다</string>
+    <string name="mission_none_available">사용할 수 있는 미션이 없습니다.</string>
+    <string name="mission_header">미션 %1$d / %2$d · %3$s</string>
+    <string name="mission_talking_to">%1$s와(과) 대화하고 있습니다.</string>
+    <string name="mission_default_success">좋아요 — 성공했어요! 상대가 알아들었고 대화가 계속됩니다.</string>
+    <string name="mission_pick_what_to_say">무슨 말을 할지 선택하세요.</string>
+    <string name="mission_next">다음 미션</string>
+    <string name="mission_continue">계속</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">%1$s 음성을 사용할 수 없습니다</string>
+    <string name="tts_missing_data_message">문장을 소리로 들으려면 %1$s 음성 데이터를 다운로드해야 합니다.</string>
+    <string name="tts_not_supported_message">사용 중인 텍스트 음성 변환 엔진이 %1$s을(를) 지원하지 않습니다. 설정을 열어 설치하거나 지원하는 엔진으로 전환하세요.</string>
+    <string name="tts_download">다운로드</string>
+    <string name="tts_open_settings">설정 열기</string>
+    <string name="tts_not_now">나중에</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">학습 가이드를 생성하지 못했습니다</string>
+    <string name="error_generate_missions">미션을 생성하지 못했습니다</string>
+    <string name="error_session_not_found">학습을 찾을 수 없습니다</string>
+</resources>

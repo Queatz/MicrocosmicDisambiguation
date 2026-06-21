@@ -7,25 +7,26 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.queatz.microcosmicdisambiguation.data.BLANK
+import com.queatz.microcosmicdisambiguation.data.Language
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The state of the [Speaker]'s underlying [TextToSpeech] engine with respect to speaking
- * Simplified Chinese.
+ * The state of the [Speaker]'s underlying [TextToSpeech] engine with respect to speaking the
+ * target language it was configured for.
  */
 enum class SpeakerStatus {
     /** The engine has not finished initializing yet. */
     Initializing,
 
-    /** The engine is ready and Simplified Chinese voice data is installed. */
+    /** The engine is ready and the target language voice data is installed. */
     Ready,
 
-    /** The engine supports Simplified Chinese, but the voice data needs to be downloaded. */
+    /** The engine supports the target language, but the voice data needs to be downloaded. */
     MissingData,
 
-    /** The selected engine does not support Simplified Chinese at all. */
+    /** The selected engine does not support the target language at all. */
     NotSupported,
 
     /** The engine failed to initialize. */
@@ -33,18 +34,18 @@ enum class SpeakerStatus {
 }
 
 /**
- * A thin wrapper around Android [TextToSpeech] configured for Mandarin Chinese.
+ * A thin wrapper around Android [TextToSpeech] configured for the given [language].
  *
  * Use [speak] to read text aloud and call [shutdown] when the owner is destroyed.
  *
  * [speak] optionally reports progress through its callbacks so the UI can highlight the
  * characters/words that are currently being spoken.
  *
- * The engine reports whether Simplified Chinese is ready to use through [status] and
+ * The engine reports whether the [language] is ready to use through [status] and
  * [onStatusChanged]. When the status is [SpeakerStatus.MissingData] the caller should prompt the
  * user to download the voice data, launching [installTtsDataIntent].
  */
-class Speaker(context: Context) : TtsEngine {
+class Speaker(context: Context, language: Language) : TtsEngine {
 
     @Volatile
     private var ready = false
@@ -74,7 +75,7 @@ class Speaker(context: Context) : TtsEngine {
 
     private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { initStatus ->
         if (initStatus == TextToSpeech.SUCCESS) {
-            when (tts.setLanguage(Locale.SIMPLIFIED_CHINESE)) {
+            when (tts.setLanguage(Locale.forLanguageTag(language.localeTag))) {
                 TextToSpeech.LANG_MISSING_DATA -> {
                     ready = false
                     updateStatus(SpeakerStatus.MissingData)
@@ -128,7 +129,7 @@ class Speaker(context: Context) : TtsEngine {
     }
 
     /**
-     * Speaks [text] out loud in Mandarin, interrupting anything currently being spoken.
+     * Speaks [text] out loud in the configured language, interrupting anything currently being spoken.
      *
      * @param onStart invoked on the main thread when playback begins
      * @param onRange invoked on the main thread as each chunk is spoken, with the

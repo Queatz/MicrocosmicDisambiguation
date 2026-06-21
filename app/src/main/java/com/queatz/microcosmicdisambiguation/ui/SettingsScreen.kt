@@ -1,6 +1,7 @@
 package com.queatz.microcosmicdisambiguation.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,19 +15,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.queatz.microcosmicdisambiguation.R
+import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.TtsMode
 
 /**
@@ -36,7 +48,10 @@ import com.queatz.microcosmicdisambiguation.data.TtsMode
 @Composable
 fun SettingsScreen(
     ttsMode: TtsMode,
+    sourceLanguage: Language,
+    targetLanguage: Language,
     onSelectMode: (TtsMode) -> Unit,
+    onSelectSourceLanguage: (Language) -> Unit,
     onBack: () -> Unit,
     onOpenRecordings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -52,18 +67,31 @@ fun SettingsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.back),
                 )
             }
             Text(
-                text = "Settings",
+                text = stringResource(R.string.settings),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
         }
 
         Text(
-            text = "Text-to-speech engine",
+            text = stringResource(R.string.settings_your_language),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        SourceLanguageSelector(
+            sourceLanguage = sourceLanguage,
+            targetLanguage = targetLanguage,
+            onSelect = onSelectSourceLanguage,
+        )
+
+        Text(
+            text = stringResource(R.string.settings_tts_engine),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -71,28 +99,104 @@ fun SettingsScreen(
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             TtsModeOption(
-                title = "AI (Qwen)",
-                description = "Natural native speaker voice. Requires an " +
-                    "internet connection.",
+                title = stringResource(R.string.settings_tts_ai_title),
+                description = stringResource(R.string.settings_tts_ai_description),
                 selected = ttsMode == TtsMode.Ai,
                 onSelect = { onSelectMode(TtsMode.Ai) },
             )
             TtsModeOption(
-                title = "System",
-                description = "Uses your device's built-in text-to-speech engine. Works offline.",
+                title = stringResource(R.string.settings_tts_system_title),
+                description = stringResource(R.string.settings_tts_system_description),
                 selected = ttsMode == TtsMode.System,
                 onSelect = { onSelectMode(TtsMode.System) },
             )
         }
 
         Text(
-            text = "Recordings",
+            text = stringResource(R.string.recordings),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         RecordingsEntry(onClick = onOpenRecordings)
+    }
+}
+
+/**
+ * Lets the learner pick the language they already know (the source language). The current target
+ * language is excluded, since a session needs two different languages.
+ */
+@Composable
+private fun SourceLanguageSelector(
+    sourceLanguage: Language,
+    targetLanguage: Language,
+    onSelect: (Language) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .clickable { expanded = true },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_i_speak),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "${sourceLanguage.flag} ${sourceLanguage.displayName}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            Language.entries.forEach { language ->
+                if (language != targetLanguage) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = "${language.flag} ${language.displayName}",
+                                fontWeight = if (language == sourceLanguage) {
+                                    FontWeight.Bold
+                                } else {
+                                    FontWeight.Normal
+                                },
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            if (language != sourceLanguage) onSelect(language)
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -125,12 +229,12 @@ private fun RecordingsEntry(onClick: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "Review recordings",
+                    text = stringResource(R.string.settings_review_recordings),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "Listen to your saved voice recordings and their transcriptions.",
+                    text = stringResource(R.string.settings_review_recordings_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

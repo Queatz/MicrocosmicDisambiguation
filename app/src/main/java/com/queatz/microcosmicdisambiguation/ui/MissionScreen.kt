@@ -34,8 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.queatz.microcosmicdisambiguation.MissionUiState
+import com.queatz.microcosmicdisambiguation.R
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.Mission
 import com.queatz.microcosmicdisambiguation.data.MissionChoice
@@ -62,11 +64,11 @@ fun MissionScreen(
             CircularProgressIndicator()
             Spacer(modifier = Modifier.size(16.dp))
             Text(
-                text = "Building your missions…",
+                text = stringResource(R.string.mission_building),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = "Real-life situations you can navigate with what you studied.",
+                text = stringResource(R.string.mission_building_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -75,7 +77,7 @@ fun MissionScreen(
 
         state.error != null -> MissionStatus(modifier) {
             Text(
-                text = "Couldn't build missions",
+                text = stringResource(R.string.mission_build_failed),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -87,18 +89,18 @@ fun MissionScreen(
             )
             Spacer(modifier = Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onClose) { Text("Back") }
-                Button(onClick = onRetry) { Text("Try again") }
+                OutlinedButton(onClick = onClose) { Text(stringResource(R.string.back)) }
+                Button(onClick = onRetry) { Text(stringResource(R.string.try_again)) }
             }
         }
 
         missions.isEmpty() -> MissionStatus(modifier) {
             Text(
-                text = "No missions available.",
+                text = stringResource(R.string.mission_none_available),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(modifier = Modifier.size(8.dp))
-            Button(onClick = onClose) { Text("Back") }
+            Button(onClick = onClose) { Text(stringResource(R.string.back)) }
         }
 
         else -> MissionRunner(
@@ -227,7 +229,7 @@ private fun MissionHeader(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = "Mission $missionNumber of $missionCount · $title",
+            text = stringResource(R.string.mission_header, missionNumber, missionCount, title),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
@@ -253,7 +255,7 @@ private fun MissionHeader(
         }
         if (mission.role.isNotBlank()) {
             Text(
-                text = "You're talking to ${mission.role}.",
+                text = stringResource(R.string.mission_talking_to, mission.role),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -332,7 +334,7 @@ private fun TurnContent(
         // warm fallback if the generated reply was empty) so the learner sees their success, not
         // just the negative outcomes of wrong choices.
         val outcome = choice.reply.ifBlank {
-            if (choice.correct) "Nice — that worked! They understood you and the conversation moves on." else ""
+            if (choice.correct) stringResource(R.string.mission_default_success) else ""
         }
         if (outcome.isNotBlank()) {
             Surface(
@@ -418,7 +420,7 @@ private fun MissionActions(
 ) {
     when {
         selected == null -> Text(
-            text = "Pick what you'd say.",
+            text = stringResource(R.string.mission_pick_what_to_say),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
@@ -429,21 +431,21 @@ private fun MissionActions(
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Try again")
+            Text(stringResource(R.string.try_again))
         }
 
         isLastTurn -> Button(
             onClick = onNextMission,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (isLastMission) "Finish" else "Next mission")
+            Text(if (isLastMission) stringResource(R.string.finish) else stringResource(R.string.mission_next))
         }
 
         else -> Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Continue")
+            Text(stringResource(R.string.mission_continue))
         }
     }
 }

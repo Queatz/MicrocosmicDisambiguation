@@ -1,0 +1,83 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">Назад</string>
+    <string name="cancel">Отмена</string>
+    <string name="delete">Удалить</string>
+    <string name="close">Закрыть</string>
+    <string name="next">Далее</string>
+    <string name="stop">Стоп</string>
+    <string name="finish">Готово</string>
+    <string name="settings">Настройки</string>
+    <string name="recordings">Записи</string>
+    <string name="try_again">Повторить</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">Что происходит?</string>
+    <string name="home_describe_situation">Опишите реальную ситуацию, чтобы изучить её.</string>
+    <string name="home_irl_situation_placeholder">Реальная ситуация</string>
+    <string name="home_voice_input">Голосовой ввод</string>
+    <string name="home_stop_voice_input">Остановить голосовой ввод</string>
+    <string name="home_generating">Генерация…</string>
+    <string name="home_study_this">Изучить это</string>
+    <string name="home_learning">Я учусь</string>
+    <string name="home_change_language">Сменить язык</string>
+    <string name="home_previous_sessions">Предыдущие занятия</string>
+    <string name="home_no_sessions">Пока нет занятий. Опишите реальную ситуацию в поле выше, чтобы начать обучение — ваши занятия появятся здесь.</string>
+    <string name="home_delete_session_title">Удалить занятие?</string>
+    <string name="home_delete_session_message">Это навсегда удалит «%1$s».</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">Ваш язык</string>
+    <string name="settings_i_speak">Я говорю на</string>
+    <string name="settings_tts_engine">Движок синтеза речи</string>
+    <string name="settings_tts_ai_title">ИИ (Qwen)</string>
+    <string name="settings_tts_ai_description">Естественный голос носителя языка. Требуется подключение к интернету.</string>
+    <string name="settings_tts_system_title">Системный</string>
+    <string name="settings_tts_system_description">Использует встроенный в устройство движок синтеза речи. Работает офлайн.</string>
+    <string name="settings_review_recordings">Просмотреть записи</string>
+    <string name="settings_review_recordings_description">Прослушайте сохранённые голосовые записи и их расшифровки.</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">Пока нет записей. Продиктуйте реальную ситуацию, чтобы создать запись.</string>
+    <string name="recordings_delete_title">Удалить запись?</string>
+    <string name="recordings_delete_message">Это навсегда удалит аудио и его расшифровку.</string>
+    <string name="recordings_play">Воспроизвести запись</string>
+    <string name="recordings_no_transcription">(без расшифровки)</string>
+    <string name="recordings_subtitle">%1$s · %2$.1f с</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">Нет материала для изучения.</string>
+    <string name="study_try_mission">Попробовать реальную миссию</string>
+    <string name="study_words">Слова</string>
+    <string name="study_breakdown">Разбор</string>
+    <string name="study_play_sentence">Воспроизвести предложение</string>
+    <string name="study_word_by_word">По словам</string>
+    <string name="study_next_word">Следующее слово</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">Создаём ваши миссии…</string>
+    <string name="mission_building_subtitle">Реальные ситуации, которые можно пройти с помощью изученного.</string>
+    <string name="mission_build_failed">Не удалось создать миссии</string>
+    <string name="mission_none_available">Нет доступных миссий.</string>
+    <string name="mission_header">Миссия %1$d из %2$d · %3$s</string>
+    <string name="mission_talking_to">Вы говорите с %1$s.</string>
+    <string name="mission_default_success">Отлично — получилось! Вас поняли, и разговор продолжается.</string>
+    <string name="mission_pick_what_to_say">Выберите, что сказать.</string>
+    <string name="mission_next">Следующая миссия</string>
+    <string name="mission_continue">Продолжить</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">Голос для языка «%1$s» недоступен</string>
+    <string name="tts_missing_data_message">Чтобы слышать произношение предложений, нужно загрузить голосовые данные для языка «%1$s».</string>
+    <string name="tts_not_supported_message">Ваш движок синтеза речи не поддерживает язык «%1$s». Откройте настройки, чтобы установить, или переключитесь на движок с поддержкой.</string>
+    <string name="tts_download">Загрузить</string>
+    <string name="tts_open_settings">Открыть настройки</string>
+    <string name="tts_not_now">Не сейчас</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">Не удалось создать учебное руководство</string>
+    <string name="error_generate_missions">Не удалось создать миссии</string>
+    <string name="error_session_not_found">Занятие не найдено</string>
+</resources>

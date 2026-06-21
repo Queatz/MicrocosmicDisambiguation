@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -66,11 +67,15 @@ fun MicrocosmicDisambiguationApp() {
     val state by viewModel.uiState.collectAsState()
 
     val context = LocalContext.current
-    // The active engine is recreated whenever the user switches TTS modes in settings.
-    val speaker: TtsEngine = remember(state.ttsMode) {
+    // The language the active speaker reads in. It tracks the home-screen target selection, but
+    // each study/mission screen overrides it with that session's own target language so reopening
+    // an old session always speaks the language it was created in.
+    var speakerLanguage by remember { mutableStateOf(state.languagePair.target) }
+    // The active engine is recreated whenever the user switches TTS modes or the spoken language.
+    val speaker: TtsEngine = remember(state.ttsMode, speakerLanguage) {
         when (state.ttsMode) {
-            TtsMode.Ai -> QwenSpeaker(context, viewModel.qwenService)
-            TtsMode.System -> Speaker(context)
+            TtsMode.Ai -> QwenSpeaker(context, viewModel.qwenService, speakerLanguage)
+            TtsMode.System -> Speaker(context, speakerLanguage)
         }
     }
     var speakerStatus by remember { mutableStateOf(SpeakerStatus.Initializing) }
@@ -79,8 +84,11 @@ fun MicrocosmicDisambiguationApp() {
         onDispose { speaker.shutdown() }
     }
 
-    // Real-time speech-to-text for dictating the "IRL situation" on the home screen.
-    val speechRecognizer = remember { QwenSpeechRecognizer() }
+    // Real-time speech-to-text for dictating the "IRL situation" on the home screen, biased toward
+    // the language the learner knows (the source language).
+    val speechRecognizer = remember(state.languagePair.source) {
+        QwenSpeechRecognizer(languageHints = listOf(state.languagePair.source.asrCode))
+    }
     DisposableEffect(speechRecognizer) {
         // Persist the raw audio and final transcript of each completed dictation session.
         speechRecognizer.onSessionComplete = { audio, transcript ->
@@ -97,16 +105,16 @@ fun MicrocosmicDisambiguationApp() {
         (speakerStatus == SpeakerStatus.MissingData || speakerStatus == SpeakerStatus.NotSupported)
     ) {
         val missingData = speakerStatus == SpeakerStatus.MissingData
+        val languageName = speakerLanguage.displayName
         AlertDialog(
             onDismissRequest = { ttsPromptDismissed = true },
-            title = { Text("Chinese voice unavailable") },
+            title = { Text(stringResource(R.string.tts_voice_unavailable_title, languageName)) },
             text = {
                 Text(
                     if (missingData) {
-                        "To hear sentences read aloud, the Simplified Chinese voice data needs to be downloaded."
+                        stringResource(R.string.tts_missing_data_message, languageName)
                     } else {
-                        "Your text-to-speech engine doesn't support Simplified Chinese. " +
-                            "Open settings to install or switch to an engine that does."
+                        stringResource(R.string.tts_not_supported_message, languageName)
                     }
                 )
             },
@@ -124,12 +132,12 @@ fun MicrocosmicDisambiguationApp() {
                         // No activity available to handle the request; nothing else we can do.
                     }
                 }) {
-                    Text(if (missingData) "Download" else "Open settings")
+                    Text(if (missingData) stringResource(R.string.tts_download) else stringResource(R.string.tts_open_settings))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { ttsPromptDismissed = true }) {
-                    Text("Not now")
+                    Text(stringResource(R.string.tts_not_now))
                 }
             },
         )
@@ -154,6 +162,10 @@ fun MicrocosmicDisambiguationApp() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(ROUTE_HOME) {
+                // On the home screen, the speaker reads the currently selected target language.
+                LaunchedEffect(state.languagePair.target) {
+                    speakerLanguage = state.languagePair.target
+                }
                 HomeScreen(
                     state = state,
                     recognizer = speechRecognizer,
@@ -162,12 +174,16 @@ fun MicrocosmicDisambiguationApp() {
                     onDeleteSession = { id -> viewModel.deleteSession(id) },
                     onOpenSettings = { navController.navigate(ROUTE_SETTINGS) },
                     onDismissError = { viewModel.clearError() },
+                    onTargetLanguageChange = { viewModel.setTargetLanguage(it) },
                 )
             }
             composable(ROUTE_SETTINGS) {
                 SettingsScreen(
                     ttsMode = state.ttsMode,
+                    sourceLanguage = state.languagePair.source,
+                    targetLanguage = state.languagePair.target,
                     onSelectMode = { viewModel.setTtsMode(it) },
+                    onSelectSourceLanguage = { viewModel.setSourceLanguage(it) },
                     onBack = { navController.popBackStack() },
                     onOpenRecordings = { navController.navigate(ROUTE_RECORDINGS) },
                 )
@@ -185,6 +201,8 @@ fun MicrocosmicDisambiguationApp() {
                 arguments = listOf(navArgument(ARG_ID) { type = NavType.LongType }),
             ) { entry ->
                 val id = entry.arguments?.getLong(ARG_ID) ?: 0L
+                // Speak this session in its own target language, not the current selection.
+                LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
                 val guide = remember(id) { viewModel.guide(id) }
                 if (guide == null) {
                     navController.popBackStack()
@@ -203,6 +221,7 @@ fun MicrocosmicDisambiguationApp() {
             ) { entry ->
                 val id = entry.arguments?.getLong(ARG_ID) ?: 0L
                 val missionState by viewModel.missionState.collectAsState()
+                LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
                 LaunchedEffect(id) { viewModel.loadMissions(id) }
                 MissionScreen(
                     title = remember(id) { viewModel.title(id) },
