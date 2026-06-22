@@ -9,6 +9,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -93,7 +95,7 @@ fun HomeScreen(
 
     val configuration = LocalConfiguration.current
     val useTwoColumnLayout = state.history.isNotEmpty() && (
-            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || configuration.screenWidthDp >= 900
+            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE || configuration.screenWidthDp >= 600
         )
 
     if (useTwoColumnLayout) {
@@ -112,7 +114,9 @@ fun HomeScreen(
                 onDismissError = onDismissError,
                 onTargetLanguageChange = onTargetLanguageChange,
                 focusRequester = focusRequester,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
             )
             PreviousSessionsSection(
                 state = state,
@@ -129,22 +133,40 @@ fun HomeScreen(
                 .padding(horizontal = 20.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            MainSection(
-                state = state,
-                recognizer = recognizer,
-                situation = situation,
-                onSituationChange = { situation = it },
-                onStudy = onStudy,
-                onDismissError = onDismissError,
-                onTargetLanguageChange = onTargetLanguageChange,
-                focusRequester = focusRequester,
-            )
-            PreviousSessionsSection(
-                state = state,
-                onOpenSession = onOpenSession,
-                onDeleteSession = onDeleteSession,
-                onOpenSettings = onOpenSettings,
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                TargetLanguageButton(
+                    languagePair = state.languagePair,
+                    onTargetLanguageChange = onTargetLanguageChange,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                MainSection(
+                    state = state,
+                    recognizer = recognizer,
+                    situation = situation,
+                    onSituationChange = { situation = it },
+                    onStudy = onStudy,
+                    onDismissError = onDismissError,
+                    onTargetLanguageChange = onTargetLanguageChange,
+                    focusRequester = focusRequester,
+                    showLanguageButton = false,
+                )
+                PreviousSessionsSection(
+                    state = state,
+                    onOpenSession = onOpenSession,
+                    onDeleteSession = onDeleteSession,
+                    onOpenSettings = onOpenSettings,
+                    scrollable = true,
+                )
+            }
         }
     }
 }
@@ -160,6 +182,7 @@ private fun MainSection(
     onTargetLanguageChange: (Language) -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
+    showLanguageButton: Boolean = true,
 ) {
     val context = LocalContext.current
     var isListening by remember { mutableStateOf(false) }
@@ -209,14 +232,16 @@ private fun MainSection(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center,
-        ) {
-            TargetLanguageButton(
-                languagePair = state.languagePair,
-                onTargetLanguageChange = onTargetLanguageChange,
-            )
+        if (showLanguageButton) {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                TargetLanguageButton(
+                    languagePair = state.languagePair,
+                    onTargetLanguageChange = onTargetLanguageChange,
+                )
+            }
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -401,6 +426,7 @@ private fun PreviousSessionsSection(
     onDeleteSession: (Long) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    scrollable: Boolean = false,
 ) {
     Column(
         modifier = modifier,
@@ -434,22 +460,36 @@ private fun PreviousSessionsSection(
         }
 
         if (state.history.isNotEmpty()) {
-            val listState = rememberLazyListState()
-            LaunchedEffect(state.history.size) {
-                listState.animateScrollToItem(0)
-            }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 24.dp),
-            ) {
-                items(state.history, key = { it.id }) { item ->
-                    HistoryRow(
-                        item = item,
-                        onClick = { onOpenSession(item.id) },
-                        onLongClick = { onDeleteSession(item.id) },
-                    )
+            if (scrollable) {
+                // Rendered inside an outer verticalScroll, so use a plain Column to avoid
+                // nesting two vertically scrollable containers.
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    state.history.forEach { item ->
+                        HistoryRow(
+                            item = item,
+                            onClick = { onOpenSession(item.id) },
+                            onLongClick = { onDeleteSession(item.id) },
+                        )
+                    }
+                }
+            } else {
+                val listState = rememberLazyListState()
+                LaunchedEffect(state.history.size) {
+                    listState.animateScrollToItem(0)
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    items(state.history, key = { it.id }) { item ->
+                        HistoryRow(
+                            item = item,
+                            onClick = { onOpenSession(item.id) },
+                            onLongClick = { onDeleteSession(item.id) },
+                        )
+                    }
                 }
             }
         }
