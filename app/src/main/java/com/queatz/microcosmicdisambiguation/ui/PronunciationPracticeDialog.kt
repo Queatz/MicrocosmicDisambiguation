@@ -65,6 +65,12 @@ private val CorrectColor = Color(0xFF2E7D32)
 /** Colour code for a mispronounced or missing unit. */
 private val IncorrectColor = Color(0xFFC62828)
 
+/**
+ * The minimum accuracy at which the recording auto-ends: a full match (every target unit
+ * pronounced correctly), so practice never stops on a near-miss.
+ */
+private const val AUTO_STOP_THRESHOLD = 1.0
+
 /** The distinct stages of a single pronunciation-practice attempt. */
 private enum class PracticePhase { Idle, Listening, Processing, Result, Error }
 
@@ -103,6 +109,9 @@ fun PronunciationPracticeDialog(
     var recordedAudio by remember { mutableStateOf<ByteArray?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isPlayingComparison by remember { mutableStateOf(false) }
+    // Set the moment the live transcript matches the target perfectly, so the UI can briefly
+    // confirm the success that ended the recording on its own.
+    var autoStopped by remember { mutableStateOf(false) }
 
     DisposableEffect(recognizer) {
         recognizer.onListeningChanged = { listening ->
@@ -113,7 +122,19 @@ fun PronunciationPracticeDialog(
                 phase = PracticePhase.Processing
             }
         }
-        recognizer.onTextChanged = { transcript = it }
+        recognizer.onTextChanged = { live ->
+            transcript = live
+            // Auto-end the recording the instant the learner has said every unit correctly, so
+            // they don't have to tap stop themselves. Requiring a full match avoids stopping on a
+            // near-miss while the transcript is still being refined.
+            if (phase == PracticePhase.Listening) {
+                val partial = comparePronunciation(target, live, language.characterSegmented)
+                if (partial.score >= AUTO_STOP_THRESHOLD) {
+                    autoStopped = true
+                    recognizer.stop()
+                }
+            }
+        }
         recognizer.onError = { message ->
             errorMessage = message
             phase = PracticePhase.Error
@@ -167,6 +188,7 @@ fun PronunciationPracticeDialog(
         feedback = null
         recordedAudio = null
         errorMessage = null
+        autoStopped = false
         recognizer.start()
     }
 
@@ -252,6 +274,9 @@ fun PronunciationPracticeDialog(
                         text = target,
                         style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
+                        // Flash the target green the moment a perfect reading auto-stops the
+                        // recording, so the learner sees why it ended before the full result lands.
+                        color = if (autoStopped) CorrectColor else Color.Unspecified,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

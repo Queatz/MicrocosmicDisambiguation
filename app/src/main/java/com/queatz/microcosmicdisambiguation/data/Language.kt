@@ -14,7 +14,7 @@ package com.queatz.microcosmicdisambiguation.data
  *   engine
  * @param ttsLanguageType the `language_type` value the Qwen cloud TTS expects
  * @param ttsVoice the Qwen cloud TTS voice to read this language with
- * @param asrCode the `language_hints` code passed to the Qwen real-time speech recognizer when the
+ * @param asrCode the `language` hint passed to the Qwen real-time speech recognizer when the
  *   learner dictates a situation in this language
  * @param scriptDescription a short description of the writing system, injected into the AI prompt so
  *   the generated study guide uses the correct script

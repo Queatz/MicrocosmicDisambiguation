@@ -6,6 +6,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
 import android.util.Log
 import com.queatz.microcosmicdisambiguation.ai.QwenService
 import kotlinx.serialization.SerialName
@@ -16,34 +17,37 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
 import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Streams microphone audio to the Qwen (Alibaba DashScope) real-time speech recognition service and
- * surfaces a live, growing transcript. The Fun-ASR real-time model recognizes Chinese, English, and
- * Japanese (biased via `language_hints`); for other session languages the hint is dropped and the
- * model auto-detects rather than mis-transcribing as an unsupported language.
+ * surfaces a live, growing transcript. The Qwen3-ASR Flash real-time model recognizes a wide range
+ * of languages (Chinese, English, Cantonese, Japanese, Korean, Russian, Vietnamese, German, French,
+ * and many more), biased via the optional `language` hint, so the dictated text matches the language
+ * the learner is speaking. Codes the model can't recognize (e.g. Burmese) are dropped so the model
+ * auto-detects instead of mis-transcribing.
  *
- * The flow follows DashScope's WebSocket protocol: connect, send a `run-task` instruction, wait for
- * `task-started`, then push raw 16 kHz mono PCM frames captured from [AudioRecord] while consuming
- * the `result-generated` events the server streams back. Finalized sentences are concatenated; the
- * sentence currently being spoken is appended live so the text field updates in real time.
+ * The flow follows DashScope's OpenAI-style realtime WebSocket protocol: connect, send a
+ * `session.update` instruction (manual turn detection), wait for `session.created`, then push raw
+ * 16 kHz mono PCM frames captured from [AudioRecord] as base64 `input_audio_buffer.append` events
+ * while consuming the `conversation.item.input_audio_transcription.text` events the server streams
+ * back. On stop, `input_audio_buffer.commit` and `session.finish` are sent; the final
+ * `...transcription.completed` transcript is delivered when it arrives.
  *
  * All listener callbacks are delivered on the main thread. The caller is responsible for holding the
  * `RECORD_AUDIO` runtime permission before invoking [start].
  */
 class QwenSpeechRecognizer(
     private val apiKey: String = QwenService.QWEN_API_KEY,
-    /** `language_hints` codes biasing recognition toward the languages the learner dictates in. */
+    /** Language codes biasing recognition toward the languages the learner dictates in. */
     private val languageHints: List<String> = emptyList(),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        encodeDefaults = true
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -55,13 +59,10 @@ class QwenSpeechRecognizer(
     private var recordThread: Thread? = null
     private var audioRecord: AudioRecord? = null
 
-    /** The id of the task currently running, needed to address the matching `finish-task`. */
-    private var currentTaskId: String? = null
-
-    /** Sentences the server has already finalized, joined together. */
+    /** Transcripts the server has already finalized (via `...completed`), joined together. */
     private var finalizedText: String = ""
 
-    /** The in-progress sentence the server is still refining. */
+    /** The in-progress transcript the server is still refining. */
     private var partialText: String = ""
 
     /** Accumulates the raw PCM frames captured during the session so they can be saved on stop. */
@@ -97,20 +98,19 @@ class QwenSpeechRecognizer(
         synchronized(recordedAudio) { recordedAudio.reset() }
         notifyListening(true)
 
-        val taskId = UUID.randomUUID().toString().replace("-", "").take(32)
-        currentTaskId = taskId
         val request = Request.Builder()
-            .url(ENDPOINT)
-            .header("Authorization", "bearer $apiKey")
+            .url("$ENDPOINT?model=$MODEL")
+            .header("Authorization", "Bearer $apiKey")
+            .header("OpenAI-Beta", "realtime=v1")
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send(runTaskMessage(taskId))
+                webSocket.send(sessionUpdateMessage())
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                handleEvent(webSocket, taskId, text)
+                handleEvent(webSocket, text)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -131,39 +131,42 @@ class QwenSpeechRecognizer(
     fun stop() {
         if (!listening.get()) return
         stopRecording()
-        currentTaskId?.let { webSocket?.send(finishTaskMessage(it)) }
+        webSocket?.let {
+            // Manual turn detection: commit the buffered audio, then end the session.
+            it.send(simpleMessage("input_audio_buffer.commit"))
+            it.send(simpleMessage("session.finish"))
+        }
         // The session is over from the user's perspective the moment they tap stop.
         listening.set(false)
         notifyListening(false)
     }
 
-    private fun handleEvent(webSocket: WebSocket, taskId: String, message: String) {
+    private fun handleEvent(webSocket: WebSocket, message: String) {
         val event = try {
-            json.decodeFromString(AsrEvent.serializer(), message)
+            json.decodeFromString(RealtimeEvent.serializer(), message)
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to parse Qwen ASR event: $message", t)
             return
         }
 
-        when (event.header?.event) {
-            "task-started" -> startRecording(webSocket)
-            "result-generated" -> {
-                val sentence = event.payload?.output?.sentence ?: return
-                val text = sentence.text.orEmpty()
-                if (sentence.sentenceEnd) {
-                    finalizedText += text
-                    partialText = ""
-                } else {
-                    partialText = text
-                }
+        when (event.type) {
+            "session.created" -> startRecording(webSocket)
+            "conversation.item.input_audio_transcription.text" -> {
+                // `text` is the confirmed transcript so far; `stash` is the tentative tail.
+                partialText = event.text.orEmpty() + event.stash.orEmpty()
                 notifyText(finalizedText + partialText)
             }
-            "task-finished" -> {
+            "conversation.item.input_audio_transcription.completed" -> {
+                finalizedText += event.transcript.orEmpty()
+                partialText = ""
+                notifyText(finalizedText)
+            }
+            "session.finished" -> {
                 webSocket.close(1000, null)
                 finishLocally()
             }
-            "task-failed" -> {
-                val reason = event.header.errorMessage ?: "Speech recognition failed"
+            "error" -> {
+                val reason = event.error?.message ?: "Speech recognition failed"
                 webSocket.close(1000, null)
                 fail(reason)
             }
@@ -209,8 +212,8 @@ class QwenSpeechRecognizer(
                 while (listening.get()) {
                     val read = record.read(buffer, 0, buffer.size)
                     if (read > 0) {
-                        val frame: ByteString = buffer.toByteString(0, read)
-                        webSocket.send(frame)
+                        val encoded = Base64.encodeToString(buffer, 0, read, Base64.NO_WRAP)
+                        webSocket.send(appendAudioMessage(encoded))
                         synchronized(recordedAudio) { recordedAudio.write(buffer, 0, read) }
                     }
                 }
@@ -245,7 +248,7 @@ class QwenSpeechRecognizer(
     private fun deliverRecording() {
         if (!completed.compareAndSet(false, true)) return
         val audio = synchronized(recordedAudio) { recordedAudio.toByteArray() }
-        val transcript = finalizedText
+        val transcript = finalizedText.ifBlank { partialText }
         if (audio.isEmpty() || transcript.isBlank()) return
         mainHandler.post { onSessionComplete?.invoke(audio, transcript) }
     }
@@ -280,54 +283,51 @@ class QwenSpeechRecognizer(
         mainHandler.post { onListeningChanged?.invoke(value) }
     }
 
-    private fun runTaskMessage(taskId: String): String {
-        val message = AsrRequest(
-            header = AsrRequestHeader(action = "run-task", taskId = taskId, streaming = "duplex"),
-            payload = AsrRequestPayload(
-                taskGroup = "audio",
-                task = "asr",
-                function = "recognition",
-                model = MODEL,
-                parameters = AsrParameters(
-                    format = "pcm",
-                    sampleRate = SAMPLE_RATE,
-                    // Drop codes the model can't recognize (e.g. Vietnamese, Burmese); an
-                    // unsupported hint would be ignored or fail, so we let the model auto-detect
-                    // instead of mis-transcribing as the wrong language.
-                    languageHints = languageHints
-                        .filter { it in SUPPORTED_LANGUAGE_HINTS }
-                        .takeIf { it.isNotEmpty() },
-                ),
-                input = AsrInput(),
+    private fun sessionUpdateMessage(): String {
+        // The model accepts a single optional language hint; pick the first code it can recognize.
+        val language = languageHints.firstOrNull { it in SUPPORTED_LANGUAGES }
+        val message = SessionUpdateEvent(
+            eventId = eventId(),
+            session = SessionConfig(
+                inputAudioTranscription = TranscriptionConfig(language = language),
+                // null turn detection selects manual mode, where we control commit/finish.
+                turnDetection = null,
             ),
         )
-        return json.encodeToString(AsrRequest.serializer(), message)
+        return json.encodeToString(SessionUpdateEvent.serializer(), message)
     }
 
-    private fun finishTaskMessage(taskId: String): String {
-        val message = AsrRequest(
-            header = AsrRequestHeader(action = "finish-task", taskId = taskId, streaming = "duplex"),
-            payload = AsrRequestPayload(input = AsrInput()),
-        )
-        return json.encodeToString(AsrRequest.serializer(), message)
+    private fun appendAudioMessage(base64Audio: String): String {
+        val message = AppendAudioEvent(eventId = eventId(), audio = base64Audio)
+        return json.encodeToString(AppendAudioEvent.serializer(), message)
     }
+
+    private fun simpleMessage(type: String): String {
+        val message = SimpleEvent(type = type, eventId = eventId())
+        return json.encodeToString(SimpleEvent.serializer(), message)
+    }
+
+    private fun eventId(): String =
+        "event_" + UUID.randomUUID().toString().replace("-", "").take(24)
 
     companion object {
         private const val TAG = "QwenSpeechRecognizer"
 
         private const val ENDPOINT =
-            "wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference/"
-        private const val MODEL = "fun-asr-realtime"
+            "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
+        private const val MODEL = "qwen3-asr-flash-realtime"
 
         private const val SAMPLE_RATE = 16_000
 
         /**
-         * The `language_hints` codes the [MODEL] can actually bias toward. Codes outside this set
+         * The `language` codes the [MODEL] can bias toward. Codes outside this set (e.g. Burmese)
          * are dropped so the model falls back to automatic language detection rather than failing
          * or defaulting to the wrong language.
          */
-        private val SUPPORTED_LANGUAGE_HINTS =
-            setOf("zh", "en", "ja")
+        private val SUPPORTED_LANGUAGES = setOf(
+            "zh", "en", "yue", "ja", "ko", "ru", "vi", "de", "fr", "es", "pt",
+            "id", "it", "ar", "th", "tr", "hi", "ms", "nl",
+        )
 
         /** ~100 ms of 16 kHz mono 16-bit PCM audio per streamed frame. */
         private const val CHUNK_BYTES = 3_200
@@ -335,62 +335,56 @@ class QwenSpeechRecognizer(
 }
 
 @Serializable
-private data class AsrRequest(
-    val header: AsrRequestHeader,
-    val payload: AsrRequestPayload,
+private data class SessionUpdateEvent(
+    @SerialName("event_id") val eventId: String,
+    val session: SessionConfig,
+    val type: String = "session.update",
 )
 
 @Serializable
-private data class AsrRequestHeader(
-    val action: String,
-    @SerialName("task_id") val taskId: String? = null,
-    val streaming: String,
+private data class SessionConfig(
+    @SerialName("input_audio_transcription") val inputAudioTranscription: TranscriptionConfig,
+    @SerialName("turn_detection") val turnDetection: TurnDetection? = null,
+    val modalities: List<String> = listOf("text"),
+    @SerialName("input_audio_format") val inputAudioFormat: String = "pcm",
+    @SerialName("sample_rate") val sampleRate: Int = 16_000,
 )
 
 @Serializable
-private data class AsrRequestPayload(
-    @SerialName("task_group") val taskGroup: String? = null,
-    val task: String? = null,
-    val function: String? = null,
-    val model: String? = null,
-    val parameters: AsrParameters? = null,
-    val input: AsrInput? = null,
+private data class TranscriptionConfig(
+    val language: String? = null,
+)
+
+/** Placeholder for server-VAD configuration; unused while we run in manual mode. */
+@Serializable
+private data class TurnDetection(
+    val type: String = "server_vad",
 )
 
 @Serializable
-private data class AsrParameters(
-    val format: String,
-    @SerialName("sample_rate") val sampleRate: Int,
-    @SerialName("language_hints") val languageHints: List<String>? = null,
+private data class AppendAudioEvent(
+    @SerialName("event_id") val eventId: String,
+    val audio: String,
+    val type: String = "input_audio_buffer.append",
 )
 
 @Serializable
-private class AsrInput
-
-@Serializable
-private data class AsrEvent(
-    val header: AsrEventHeader? = null,
-    val payload: AsrEventPayload? = null,
+private data class SimpleEvent(
+    @SerialName("event_id") val eventId: String,
+    val type: String,
 )
 
 @Serializable
-private data class AsrEventHeader(
-    val event: String? = null,
-    @SerialName("error_message") val errorMessage: String? = null,
-)
-
-@Serializable
-private data class AsrEventPayload(
-    val output: AsrEventOutput? = null,
-)
-
-@Serializable
-private data class AsrEventOutput(
-    val sentence: AsrSentence? = null,
-)
-
-@Serializable
-private data class AsrSentence(
+private data class RealtimeEvent(
+    val type: String? = null,
     val text: String? = null,
-    @SerialName("sentence_end") val sentenceEnd: Boolean = false,
+    val stash: String? = null,
+    val transcript: String? = null,
+    val error: RealtimeError? = null,
+)
+
+@Serializable
+private data class RealtimeError(
+    val message: String? = null,
+    val code: String? = null,
 )

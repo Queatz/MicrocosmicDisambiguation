@@ -200,11 +200,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _missionState.value = MissionUiState(sessionId = id, isGenerating = true)
         val languages = repository.languagePairOf(entity)
+        // Generation runs on a background job tied to the ViewModel (not the screen), so it keeps
+        // going if the user leaves the mission screen; the whole pipeline — reading the study guide,
+        // calling the model, and caching the result — happens off the main thread.
         viewModelScope.launch {
             try {
-                val guide = repository.guideOf(entity)
-                val missions = withContext(Dispatchers.IO) { qwen.generateMissions(guide, languages) }
-                withContext(Dispatchers.IO) { repository.saveMissions(id, missions) }
+                val missions = withContext(Dispatchers.IO) {
+                    val guide = repository.guideOf(entity)
+                    qwen.generateMissions(guide, languages).also { repository.saveMissions(id, it) }
+                }
                 _missionState.update {
                     if (it.sessionId == id) it.copy(isGenerating = false, missions = missions) else it
                 }

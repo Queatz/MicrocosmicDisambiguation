@@ -75,6 +75,35 @@ fun alignedEnglishRange(
     return null
 }
 
+/** The punctuation characters (CJK and ASCII) used to detect punctuation-only tokens. */
+val PUNCTUATION_CHARS =
+    "，。！？、；：“”‘’（）《》〈〉【】「」—…·,.!?;:\"'()-".toSet()
+
+/** True when [this] consists entirely of punctuation, so it can be skipped during playback. */
+fun String.isPunctuationToken(): Boolean = isNotEmpty() && all { it in PUNCTUATION_CHARS }
+
+/**
+ * Tokenizes [sentence] into the real, speakable words used by the word-by-word player. This is
+ * [tokenize] with everything the learner cannot actually pronounce removed, so neither the word
+ * count nor the step-through ever lands on something that is not a word:
+ *
+ * - punctuation marks the model explicitly flagged (collected into [punctuationTokens]),
+ * - tokens that are made up entirely of punctuation characters,
+ * - whitespace-only tokens (e.g. the spaces between words in space-separated languages), which
+ *   are never spoken, so stepping onto them would require an extra, silent "next word" press, and
+ * - the [BLANK] marker that stands in for an empty, not-yet-filled blank.
+ */
+fun speakableTokens(
+    sentence: String,
+    vocabulary: List<String>,
+    punctuationTokens: Set<String> = emptySet(),
+): List<SentenceToken> = tokenize(sentence, vocabulary).filterNot {
+    it.text == BLANK ||
+        it.text.isBlank() ||
+        it.text in punctuationTokens ||
+        it.text.isPunctuationToken()
+}
+
 /**
  * Greedily splits [sentence] into word tokens, preferring the longest match from [vocabulary] at
  * each position. Characters that match no vocabulary entry become single-character tokens, so the

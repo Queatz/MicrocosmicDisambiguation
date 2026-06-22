@@ -7,6 +7,7 @@ import com.queatz.microcosmicdisambiguation.data.StudyWord
 import com.queatz.microcosmicdisambiguation.data.WordBreakdown
 import com.queatz.microcosmicdisambiguation.data.alignedEnglishRange
 import com.queatz.microcosmicdisambiguation.data.assembleSentence
+import com.queatz.microcosmicdisambiguation.data.speakableTokens
 import com.queatz.microcosmicdisambiguation.data.tokenize
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -380,6 +381,59 @@ class StudyLogicTest {
             Alignment(zh = "真", en = " really"),
         )
         assertEquals(null, alignedEnglishRange("Totally different.", "完全不同。", alignment, 0..0))
+    }
+
+    @Test
+    fun speakableTokens_dropsPunctuationSoTheWordByWordPlayerNeverCountsIt() {
+        // "我想买苹果。" — the trailing "。" must not be counted or stepped onto as a word.
+        val vocabulary = listOf("我", "想", "买", "苹果", "。")
+        val tokens = speakableTokens("我想买苹果。", vocabulary)
+
+        assertEquals(listOf("我", "想", "买", "苹果"), tokens.map { it.text })
+    }
+
+    @Test
+    fun speakableTokens_dropsModelFlaggedPunctuationEvenWhenNotAStandalonePunctuationChar() {
+        // A model can flag an entry as punctuation that isn't a recognised punctuation glyph; the
+        // explicit punctuationTokens set must still exclude it from the word-by-word count.
+        val tokens = speakableTokens(
+            sentence = "你好X",
+            vocabulary = listOf("你好", "X"),
+            punctuationTokens = setOf("X"),
+        )
+
+        assertEquals(listOf("你好"), tokens.map { it.text })
+    }
+
+    @Test
+    fun speakableTokens_dropsUnfilledBlankPlaceholders() {
+        // While a blank is still empty the assembled sentence contains "___"; it is a placeholder,
+        // not a real word, so the word-by-word player must not count or land on it.
+        val vocabulary = listOf("___", "我", "想", "买", "。")
+        val tokens = speakableTokens("我想买___。", vocabulary)
+
+        assertEquals(listOf("我", "想", "买"), tokens.map { it.text })
+    }
+
+    @Test
+    fun speakableTokens_dropsWhitespaceBetweenWordsSoNextWordNeverStepsOnSilence() {
+        // Space-separated languages put spaces between words; those spaces are never spoken, so if
+        // they were counted the learner would have to press "next word" twice to skip the silence.
+        val sentence = "Tôi muốn mua táo."
+        val vocabulary = listOf("Tôi", "muốn", "mua", "táo", ".")
+        val tokens = speakableTokens(sentence, vocabulary)
+
+        assertEquals(listOf("Tôi", "muốn", "mua", "táo"), tokens.map { it.text })
+    }
+
+    @Test
+    fun speakableTokens_keepsRealWordsWithCorrectRanges() {
+        val sentence = "我想买苹果。"
+        val tokens = speakableTokens(sentence, listOf("我", "想", "买", "苹果", "。"))
+
+        tokens.forEach { token ->
+            assertEquals(token.text, sentence.substring(token.range.first, token.range.last + 1))
+        }
     }
 
     @Test

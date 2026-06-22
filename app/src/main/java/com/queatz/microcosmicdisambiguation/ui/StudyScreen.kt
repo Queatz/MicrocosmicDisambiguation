@@ -76,7 +76,7 @@ import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import com.queatz.microcosmicdisambiguation.data.StudyWord
 import com.queatz.microcosmicdisambiguation.data.WordBreakdown
 import com.queatz.microcosmicdisambiguation.data.assembleSentence
-import com.queatz.microcosmicdisambiguation.data.tokenize
+import com.queatz.microcosmicdisambiguation.data.speakableTokens
 import kotlin.math.roundToInt
 
 @Composable
@@ -235,8 +235,9 @@ private fun SentencePage(
 
     // Tokenizes the currently assembled sentence into individual words, preferring the back-end
     // provided tokens so the word-by-word player highlights real words instead of guessing.
-    // Punctuation marks are dropped so the player steps only through real, speakable words.
-    fun assembledTokens() = tokenize(
+    // Punctuation marks and not-yet-filled blanks are dropped so the player steps only through
+    // real, speakable words (and never counts a blank placeholder as a word).
+    fun assembledTokens() = speakableTokens(
         assembledSentence(),
         buildList {
             add(BLANK)
@@ -244,7 +245,8 @@ private fun SentencePage(
             structure.words.forEach { add(it.hanzi) }
             structure.breakdown.forEach { add(it.hanzi) }
         },
-    ).filterNot { it.text in punctuationTokens || it.text.isPunctuationToken() }
+        punctuationTokens,
+    )
 
     // Speaks the assembled sentence as a whole and highlights words/characters as they are read.
     fun speakSentence() {
@@ -435,7 +437,15 @@ private fun SentencePage(
                     wordByWordIndex = null
                     speakingRange = null
                 },
-                onPractice = { practiceTarget = assembledSentence() },
+                // Drop any blanks the learner hasn't filled in yet so they only practice the
+                // words actually placed into the sentence. Removing a blank can leave a double
+                // space (or a leading/trailing one) behind, so collapse and trim those too.
+                onPractice = {
+                    practiceTarget = assembledSentence()
+                        .replace(BLANK, "")
+                        .replace(Regex("\\s+"), " ")
+                        .trim()
+                },
             )
 
             Text(
@@ -815,12 +825,6 @@ private infix fun IntRange?.overlaps(other: IntRange): Boolean {
     return first <= other.last && other.first <= last
 }
 
-/** The punctuation characters (CJK and ASCII) used to detect punctuation-only tokens. */
-private val PUNCTUATION_CHARS =
-    "，。！？、；：“”‘’（）《》〈〉【】「」—…·,.!?;:\"'()-".toSet()
-
-/** True when [this] consists entirely of punctuation, so it can be skipped during playback. */
-private fun String.isPunctuationToken(): Boolean = isNotEmpty() && all { it in PUNCTUATION_CHARS }
 
 /**
  * Builds a single template [segment], highlighting only the individual characters (words) that fall

@@ -496,34 +496,45 @@ private fun HistoryRow(item: SituationEntity, onClick: () -> Unit, onLongClick: 
                 onLongClick = { showDeleteDialog = true },
             ),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val icon = item.icon
-            if (!icon.isNullOrBlank()) {
-                Text(
-                    text = icon,
-                    style = MaterialTheme.typography.displaySmall,
-                )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = item.title.ifBlank { item.situation },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (item.situation.isNotBlank() && item.situation != item.title) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .padding(end = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val icon = item.icon
+                if (!icon.isNullOrBlank()) {
                     Text(
-                        text = item.situation,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = icon,
+                        style = MaterialTheme.typography.displaySmall,
                     )
                 }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = item.title.ifBlank { item.situation },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (item.situation.isNotBlank() && item.situation != item.title) {
+                        Text(
+                            text = item.situation,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
+            val targetFlag = Language.fromName(item.targetLang, Language.Chinese).flag
+            Text(
+                text = targetFlag,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp),
+            )
         }
     }
 }
