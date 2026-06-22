@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -104,14 +105,11 @@ fun StudyScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = guide.title,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-
-        // key by page so the blanks reset for each sentence structure
+        // key by page so the blanks reset for each sentence structure. The back button and title
+        // live inside the page so they scroll together with the rest of the content.
         SentencePage(
+            title = guide.title,
+            onClose = onClose,
             structure = structure,
             speaker = speaker,
             language = language,
@@ -134,11 +132,22 @@ fun StudyScreen(
                 Text(stringResource(R.string.close))
             }
         } else {
-            Button(
-                onClick = { page++ },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(R.string.next))
+                OutlinedButton(
+                    onClick = onStartMissions,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.study_missions))
+                }
+                Button(
+                    onClick = { page++ },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.next))
+                }
             }
         }
     }
@@ -147,6 +156,8 @@ fun StudyScreen(
 @OptIn(ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun SentencePage(
+    title: String,
+    onClose: () -> Unit,
     structure: SentenceStructure,
     speaker: TtsEngine,
     language: Language,
@@ -315,6 +326,25 @@ private fun SentencePage(
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Back button to the left of the title; both scroll with the rest of the page.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
             // Sentence structure with blanks. Tapping it plays it out loud.
             Card(
                 shape = RoundedCornerShape(24.dp),
@@ -405,7 +435,7 @@ private fun SentencePage(
                     wordByWordIndex = null
                     speakingRange = null
                 },
-                onPractice = { practiceTarget = originalSentence() },
+                onPractice = { practiceTarget = assembledSentence() },
             )
 
             Text(

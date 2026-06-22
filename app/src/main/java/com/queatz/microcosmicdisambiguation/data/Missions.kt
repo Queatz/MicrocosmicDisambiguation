@@ -86,6 +86,30 @@ data class MissionSet(
 )
 
 /**
+ * The AI's reaction to a free-form spoken reply the learner gave at a mission turn. Unlike the old
+ * multiple-choice flow there is no predefined "correct" line: the learner speaks spontaneously, and
+ * the model both helps them understand their own utterance and keeps the role-play moving.
+ *
+ * @param translation the learner's spoken [reply] rendered into the language they already know, so
+ *   they can check that they said what they meant
+ * @param reply the other person's in-character response, in the language being learned, reacting to
+ *   what the learner actually said
+ * @param replyRomanization a pronunciation guide for [reply] (empty for languages written in the
+ *   Latin alphabet, which need none)
+ * @param replyTranslation the meaning of [reply] in the language the learner already knows
+ * @param onTopic false when the learner was silent, spoke their own language, or went wildly
+ *   off-context, so the UI can nudge them to try again in the target language
+ */
+@Serializable
+data class MissionReply(
+    val translation: String = "",
+    val reply: String = "",
+    @SerialName("replyRomanization") val replyRomanization: String = "",
+    val replyTranslation: String = "",
+    val onTopic: Boolean = true,
+)
+
+/**
  * Coerces whatever shape the model emitted for a list-of-objects mission field into a clean
  * [JsonArray] of objects, mirroring [normalizeObjectList] for study guides so generation never
  * crashes on a stray shape.

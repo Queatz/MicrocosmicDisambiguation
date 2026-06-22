@@ -50,6 +50,7 @@
     <!-- Study screen -->
     <string name="study_no_content">No study content available.</string>
     <string name="study_try_mission">Try a real-life mission</string>
+    <string name="study_missions">Missions</string>
     <string name="study_words">Words</string>
     <string name="study_breakdown">Breakdown</string>
     <string name="study_play_sentence">Play sentence</string>
@@ -81,6 +82,25 @@
     <string name="mission_pick_what_to_say">Pick what you\'d say.</string>
     <string name="mission_next">Next mission</string>
     <string name="mission_continue">Continue</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">What would you say?</string>
+    <string name="mission_reply_hint">Tap "Speak now" and say it out loud.</string>
+    <string name="mission_reply_speak">Speak now</string>
+    <string name="mission_reply_stop">Stop recording</string>
+    <string name="mission_reply_recording">Recording… speak now.</string>
+    <string name="mission_reply_processing">Listening to your reply…</string>
+    <string name="mission_reply_your_reply">Your reply</string>
+    <string name="mission_reply_translation">Translation</string>
+    <string name="mission_reply_npc_response">Their response</string>
+    <string name="mission_reply_listen_npc">Listen to their reply</string>
+    <string name="mission_reply_say_back">Reply</string>
+    <string name="mission_reply_retry">Retry reply</string>
+    <string name="mission_reply_continue">Continue mission</string>
+    <string name="mission_reply_nothing_heard">(nothing heard)</string>
+    <string name="mission_reply_no_speech">Didn\'t catch that. Tap "Speak now" and try again a little louder.</string>
+    <string name="mission_reply_permission_needed">Microphone permission is needed to speak your reply.</string>
+    <string name="mission_reply_failed">Couldn\'t process your reply. Please try again.</string>
 
     <!-- Text-to-speech availability dialog -->
     <string name="tts_voice_unavailable_title">%1$s voice unavailable</string>

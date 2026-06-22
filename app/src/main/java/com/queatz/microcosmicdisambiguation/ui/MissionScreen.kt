@@ -1,5 +1,9 @@
 package com.queatz.microcosmicdisambiguation.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,47 +16,67 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.queatz.microcosmicdisambiguation.MissionUiState
 import com.queatz.microcosmicdisambiguation.R
+import com.queatz.microcosmicdisambiguation.ai.QwenService
+import com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
+import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.Mission
-import com.queatz.microcosmicdisambiguation.data.MissionChoice
+import com.queatz.microcosmicdisambiguation.data.MissionReply
 import com.queatz.microcosmicdisambiguation.data.MissionTurn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Hosts the mission experience for a study session: a simulation of real-life situations the
- * learner navigates using what they studied. Shows a loading state while missions are generated,
- * an error state with a retry, and otherwise the interactive [MissionRunner].
+ * learner navigates by speaking freely. Shows a loading state while missions are generated, an
+ * error state with a retry, and otherwise the interactive [MissionRunner].
  */
 @Composable
 fun MissionScreen(
     title: String,
     state: MissionUiState,
     speaker: TtsEngine,
+    qwenService: QwenService,
+    languages: LanguagePair,
     onClose: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -107,6 +131,8 @@ fun MissionScreen(
             title = title,
             missions = missions,
             speaker = speaker,
+            qwenService = qwenService,
+            languages = languages,
             onClose = onClose,
             modifier = modifier,
         )
@@ -134,31 +160,178 @@ private fun MissionStatus(
     }
 }
 
+/** The distinct stages of a single open-ended reply attempt within a mission turn. */
+private enum class ReplyPhase { Idle, Listening, Transcribing, Thinking, Result, Error }
+
 /**
- * Walks the learner through every [missions] in order. Each mission is a short conversation where
- * the learner picks what to say back to the other person; picking the correct line every turn
- * navigates the situation successfully and unlocks the next mission.
+ * Walks the learner through every [missions] in order. Each mission is a short conversation that the
+ * learner navigates by speaking freely: they read the situation, press "Speak now", say whatever
+ * they want in the target language, and the AI both translates their own words back to them and has
+ * the other person react in character. There is no right/wrong answer — any plausible reply advances
+ * the conversation — and the learner can keep talking back to continue the exchange within a turn,
+ * so the mission branches based on what the learner actually says.
  */
 @Composable
 private fun MissionRunner(
     title: String,
     missions: List<Mission>,
     speaker: TtsEngine,
+    qwenService: QwenService,
+    languages: LanguagePair,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // A recognizer biased toward the language being studied, so it transcribes the learner's
+    // attempt at the target language rather than the language they already know.
+    val recognizer = remember(languages.target) {
+        QwenSpeechRecognizer(languageHints = listOf(languages.target.asrCode))
+    }
+
     var missionIndex by remember { mutableIntStateOf(0) }
     // current turn within the active mission
     var turnIndex by remember(missionIndex) { mutableIntStateOf(0) }
-    // the choice the learner has tapped this turn, kept so we can show its consequence and let a
-    // wrong pick be retried before committing
-    var selected by remember(missionIndex, turnIndex) { mutableStateOf<MissionChoice?>(null) }
+    // the exchanges so far in this mission, so the AI keeps the other person consistent across turns
+    var history by remember(missionIndex) { mutableStateOf<List<MissionReply>>(emptyList()) }
+
+    // These per-attempt states are intentionally NOT keyed on the turn: the recognizer callbacks
+    // below are registered once (the recognizer outlives individual turns), so they must mutate the
+    // same state instances every turn. [advance] and [beginListening] reset them explicitly.
+    var phase by remember { mutableStateOf(ReplyPhase.Idle) }
+    var transcript by remember { mutableStateOf("") }
+    var reply by remember { mutableStateOf<MissionReply?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val mission = missions[missionIndex]
     val isLastMission = missionIndex == missions.lastIndex
     val currentTurn = mission.turns.getOrNull(turnIndex)
     // The final turn of the mission: completing it ends the mission directly (no success screen).
     val isLastTurn = turnIndex >= mission.turns.lastIndex
+
+    // The recognizer callbacks are installed once, so let them read the latest turn/context/history
+    // rather than the values captured when they were first registered.
+    val currentMission = rememberUpdatedState(mission)
+    val currentTurnState = rememberUpdatedState(currentTurn)
+    val currentHistory = rememberUpdatedState(history)
+    val currentLanguages = rememberUpdatedState(languages)
+
+    DisposableEffect(recognizer) {
+        recognizer.onListeningChanged = { listening ->
+            if (listening) {
+                phase = ReplyPhase.Listening
+            } else if (phase == ReplyPhase.Listening) {
+                // The mic stopped; wait for the transcription to arrive.
+                phase = ReplyPhase.Transcribing
+            }
+        }
+        recognizer.onTextChanged = { transcript = it }
+        recognizer.onError = { message ->
+            errorMessage = message
+            phase = ReplyPhase.Error
+        }
+        recognizer.onSessionComplete = { _, finalTranscript ->
+            transcript = finalTranscript
+            phase = ReplyPhase.Thinking
+            val turn = currentTurnState.value
+            if (turn == null) {
+                phase = ReplyPhase.Error
+            } else {
+                scope.launch {
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            qwenService.generateMissionReply(
+                                mission = currentMission.value,
+                                turn = turn,
+                                transcript = finalTranscript,
+                                languages = currentLanguages.value,
+                                history = currentHistory.value,
+                            )
+                        }
+                        reply = result
+                        phase = ReplyPhase.Result
+                        if (result.reply.isNotBlank()) speaker.speak(result.reply)
+                    } catch (t: Throwable) {
+                        errorMessage = t.message
+                            ?: context.getString(R.string.mission_reply_failed)
+                        phase = ReplyPhase.Error
+                    }
+                }
+            }
+        }
+        onDispose {
+            recognizer.onListeningChanged = null
+            recognizer.onTextChanged = null
+            recognizer.onError = null
+            recognizer.onSessionComplete = null
+            recognizer.shutdown()
+        }
+    }
+
+    // The recognizer reports neither a completion nor an error when it hears only silence (the
+    // transcript stays blank), so guard the transcribing stage with a timeout that surfaces a gentle
+    // "didn't catch that" notice and offers a retry.
+    LaunchedEffect(phase) {
+        if (phase == ReplyPhase.Transcribing) {
+            delay(6_000)
+            if (phase == ReplyPhase.Transcribing) {
+                errorMessage = context.getString(R.string.mission_reply_no_speech)
+                phase = ReplyPhase.Error
+            }
+        }
+    }
+
+    fun beginListening() {
+        transcript = ""
+        reply = null
+        errorMessage = null
+        recognizer.start()
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            beginListening()
+        } else {
+            errorMessage = context.getString(R.string.mission_reply_permission_needed)
+            phase = ReplyPhase.Error
+        }
+    }
+
+    fun startRecording() {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            beginListening()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    fun advance() {
+        reply?.let { history = history + it }
+        // Reset the per-attempt state for the next turn (these states are not turn-keyed).
+        phase = ReplyPhase.Idle
+        transcript = ""
+        reply = null
+        errorMessage = null
+        if (isLastTurn) {
+            if (isLastMission) onClose() else missionIndex++
+        } else {
+            turnIndex++
+        }
+    }
+
+    // Keep talking within the SAME turn, as if the conversation were really ongoing: the other
+    // person's just-given reply is folded into [history] (so the next AI response stays consistent
+    // and reacts to it) and the learner immediately records what they want to say back.
+    fun continueConversation() {
+        reply?.let { history = history + it }
+        startRecording()
+    }
 
     // Speak the other person's opening line whenever a new turn begins.
     LaunchedEffect(missionIndex, turnIndex) {
@@ -188,34 +361,27 @@ private fun MissionRunner(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (currentTurn != null) {
-                TurnContent(
+                OpenEndedReply(
                     turn = currentTurn,
-                    selected = selected,
-                    onSpeak = { speaker.speak(it) },
-                    onSelect = { choice ->
-                        selected = choice
-                        if (choice.hanzi.isNotBlank()) speaker.speak(choice.hanzi)
-                    },
+                    phase = phase,
+                    transcript = transcript,
+                    reply = reply,
+                    errorMessage = errorMessage,
+                    onSpeakLine = { speaker.speak(it) },
+                    onSpeakReply = { startRecording() },
+                    onStop = { recognizer.stop() },
+                    onListenNpc = { speaker.speak(it) },
+                    onContinueConversation = { continueConversation() },
+                    onRetry = { startRecording() },
                 )
             }
         }
 
         MissionActions(
+            phase = phase,
             isLastTurn = isLastTurn,
             isLastMission = isLastMission,
-            selected = selected,
-            onContinue = {
-                selected = null
-                turnIndex++
-            },
-            onRetry = { selected = null },
-            onNextMission = {
-                if (isLastMission) {
-                    onClose()
-                } else {
-                    missionIndex++
-                }
-            },
+            onContinue = { advance() },
         )
     }
 }
@@ -264,19 +430,25 @@ private fun MissionHeader(
 }
 
 /**
- * One conversation turn: the other person's line (tap to hear) and the choices the learner picks
- * between. To keep missions challenging, no English translation is shown for the line or the
- * choices — the learner must understand the Mandarin itself (only the mission's initial context in
- * the header stays in English). Once a choice is tapped its consequence ([MissionChoice.reply]) is
- * shown so the learner sees what happens — a positive outcome for the correct line, a gentle
- * correction otherwise.
+ * One conversation turn rendered as an open-ended reply interface: the other person's line (tap to
+ * hear), a short nudge for what the learner is trying to do, and — depending on [phase] — the
+ * controls to record a spoken reply, a live recording indicator, a loading state, or the three AI
+ * feedback layers (the learner's transcript, its translation, and the other person's response with a
+ * "Listen" button).
  */
 @Composable
-private fun TurnContent(
+private fun OpenEndedReply(
     turn: MissionTurn,
-    selected: MissionChoice?,
-    onSpeak: (String) -> Unit,
-    onSelect: (MissionChoice) -> Unit,
+    phase: ReplyPhase,
+    transcript: String,
+    reply: MissionReply?,
+    errorMessage: String?,
+    onSpeakLine: (String) -> Unit,
+    onSpeakReply: () -> Unit,
+    onStop: () -> Unit,
+    onListenNpc: (String) -> Unit,
+    onContinueConversation: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     if (turn.speaker.isNotBlank()) {
         Card(
@@ -284,7 +456,7 @@ private fun TurnContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .clickable { onSpeak(turn.speaker) },
+                .clickable { onSpeakLine(turn.speaker) },
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
@@ -317,135 +489,240 @@ private fun TurnContent(
         }
     }
 
-    // Shuffle the choices (stable per turn) so the correct answer isn't always in the same spot.
-    val choices = remember(turn) { turn.choices.shuffled() }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        choices.forEach { choice ->
-            ChoiceCard(
-                choice = choice,
-                selected = selected,
-                onClick = { onSelect(choice) },
+    // The conversational prompt: what the learner is being asked to say this turn.
+    Text(
+        text = turn.prompt.ifBlank { stringResource(R.string.mission_reply_prompt_default) },
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+
+    when (phase) {
+        ReplyPhase.Idle -> {
+            BigSpeakButton(
+                label = stringResource(R.string.mission_reply_speak),
+                onClick = onSpeakReply,
             )
         }
-    }
 
-    selected?.let { choice ->
-        // Always reveal the outcome of a pick. The correct line shows a positive outcome (with a
-        // warm fallback if the generated reply was empty) so the learner sees their success, not
-        // just the negative outcomes of wrong choices.
-        val outcome = choice.reply.ifBlank {
-            if (choice.correct) stringResource(R.string.mission_default_success) else ""
-        }
-        if (outcome.isNotBlank()) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = if (choice.correct) {
-                    MaterialTheme.colorScheme.tertiaryContainer
-                } else {
-                    MaterialTheme.colorScheme.errorContainer
-                },
+        ReplyPhase.Listening -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text(
+                    text = stringResource(R.string.mission_reply_recording),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Button(
+                onClick = onStop,
                 modifier = Modifier.fillMaxWidth(),
             ) {
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Text(stringResource(R.string.mission_reply_stop))
+            }
+        }
+
+        ReplyPhase.Transcribing, ReplyPhase.Thinking -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
                 Text(
-                    text = outcome,
+                    text = stringResource(R.string.mission_reply_processing),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp),
                 )
             }
+        }
+
+        ReplyPhase.Result -> {
+            reply?.let { result ->
+                // Top: the learner's own words (transcript), in the target language.
+                FeedbackBlock(
+                    label = stringResource(R.string.mission_reply_your_reply),
+                    value = transcript.ifBlank {
+                        stringResource(R.string.mission_reply_nothing_heard)
+                    },
+                )
+                // Middle: the translation of what they said, into their own language.
+                if (result.translation.isNotBlank()) {
+                    FeedbackBlock(
+                        label = stringResource(R.string.mission_reply_translation),
+                        value = result.translation,
+                    )
+                }
+                // Bottom: the other person's in-character response, with a button to hear it.
+                if (result.reply.isNotBlank()) {
+                    val npcLabel = stringResource(R.string.mission_reply_npc_response)
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = npcLabel,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = result.reply,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (result.replyRomanization.isNotBlank()) {
+                                Text(
+                                    text = result.replyRomanization,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            if (result.replyTranslation.isNotBlank()) {
+                                Text(
+                                    text = result.replyTranslation,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                            OutlinedButton(
+                                onClick = { onListenNpc(result.reply) },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 8.dp),
+                                )
+                                Text(stringResource(R.string.mission_reply_listen_npc))
+                            }
+                        }
+                    }
+                }
+                // Keep the conversation going: speak a reply back to what they just said, as if
+                // you were really talking to them. "Continue mission" (below) moves on instead.
+                BigSpeakButton(
+                    label = stringResource(R.string.mission_reply_say_back),
+                    onClick = onContinueConversation,
+                )
+            }
+        }
+
+        ReplyPhase.Error -> {
+            Text(
+                text = errorMessage ?: stringResource(R.string.mission_reply_no_speech),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            BigSpeakButton(
+                label = stringResource(R.string.mission_reply_speak),
+                onClick = onRetry,
+            )
         }
     }
 }
 
 /**
- * A single tappable choice. After selection it turns green when [MissionChoice.correct] or red
- * otherwise, so the learner sees whether the line they said worked.
+ * A large, centered, round microphone button — the main call to action for speaking. Used to start
+ * a reply, to reply back and keep the conversation going, and to try again after an error.
  */
 @Composable
-private fun ChoiceCard(
-    choice: MissionChoice,
-    selected: MissionChoice?,
-    onClick: () -> Unit,
-) {
-    val isSelected = selected === choice
-    val containerColor = when {
-        isSelected && choice.correct -> MaterialTheme.colorScheme.tertiaryContainer
-        isSelected && !choice.correct -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
-    }
-    // Once the learner lands on the correct line, lock the choices so they can't undo a win.
-    val locked = selected?.correct == true
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(enabled = !locked || isSelected, onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+private fun BigSpeakButton(label: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(96.dp),
         ) {
-            Text(
-                text = choice.hanzi,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            if (choice.pinyin.isNotBlank()) {
-                Text(
-                    text = choice.pinyin,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = label,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(40.dp),
                 )
             }
         }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+/** A small labelled block of feedback text (e.g. the transcript or its translation). */
+@Composable
+private fun FeedbackBlock(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+        )
     }
 }
 
 /**
- * The bottom action bar. After a wrong pick it offers Try again; after a correct pick it offers
- * Continue, or — on the mission's last turn — moves straight on to the next mission (or Finish),
- * since the positive outcome is already shown in the turn itself (no separate success screen).
+ * The bottom action bar. Once the other person has responded it offers "Continue mission" to move
+ * the conversation forward — or, on the mission's last turn, on to the next mission (or Finish).
+ * Before a reply has been processed it simply nudges the learner to speak.
  */
 @Composable
 private fun MissionActions(
+    phase: ReplyPhase,
     isLastTurn: Boolean,
     isLastMission: Boolean,
-    selected: MissionChoice?,
     onContinue: () -> Unit,
-    onRetry: () -> Unit,
-    onNextMission: () -> Unit,
 ) {
-    when {
-        selected == null -> Text(
-            text = stringResource(R.string.mission_pick_what_to_say),
+    if (phase == ReplyPhase.Result) {
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                when {
+                    !isLastTurn -> stringResource(R.string.mission_reply_continue)
+                    isLastMission -> stringResource(R.string.finish)
+                    else -> stringResource(R.string.mission_next)
+                },
+            )
+        }
+    } else {
+        Text(
+            text = stringResource(R.string.mission_reply_hint),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center,
         )
-
-        !selected.correct -> OutlinedButton(
-            onClick = onRetry,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.try_again))
-        }
-
-        isLastTurn -> Button(
-            onClick = onNextMission,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(if (isLastMission) stringResource(R.string.finish) else stringResource(R.string.mission_next))
-        }
-
-        else -> Button(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.mission_continue))
-        }
     }
 }

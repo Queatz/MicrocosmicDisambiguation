@@ -3,7 +3,10 @@ package com.queatz.microcosmicdisambiguation.ai
 import android.net.http.HttpResponseCache.install
 import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.LanguagePair
+import com.queatz.microcosmicdisambiguation.data.Mission
+import com.queatz.microcosmicdisambiguation.data.MissionReply
 import com.queatz.microcosmicdisambiguation.data.MissionSet
+import com.queatz.microcosmicdisambiguation.data.MissionTurn
 import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -107,6 +110,51 @@ class QwenService(
     }
 
     /**
+     * Reacts to a free-form spoken reply the learner gave at a mission [turn]. The learner's
+     * [transcript] (what the speech recognizer heard them say, in the target language) is turned
+     * into a [MissionReply] that (a) translates their own utterance back into the language they
+     * know so they can verify they said what they meant, and (b) generates a realistic, in-character
+     * response from the other person ([Mission.role]) that is contingent on what the learner
+     * actually said — advancing the role-play like a real conversation rather than scoring a
+     * right/wrong answer.
+     *
+     * [history] is the running list of prior reply exchanges this mission, oldest first, so the
+     * other person stays consistent across turns.
+     */
+    suspend fun generateMissionReply(
+        mission: Mission,
+        turn: MissionTurn,
+        transcript: String,
+        languages: LanguagePair,
+        history: List<MissionReply> = emptyList(),
+    ): MissionReply {
+        val request = ChatRequest(
+            model = MODEL,
+            responseFormat = ResponseFormat(type = "json_object"),
+            messages = listOf(
+                ChatMessage(role = "system", content = missionReplySystemPrompt(languages)),
+                ChatMessage(
+                    role = "user",
+                    content = missionReplyUserPrompt(mission, turn, transcript, languages, history),
+                ),
+            ),
+        )
+
+        val response: ChatResponse = client.post(ENDPOINT) {
+            headers {
+                append(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+        val content = response.choices.firstOrNull()?.message?.content
+            ?: error("Empty response from Qwen")
+
+        return json.decodeFromString(MissionReply.serializer(), content)
+    }
+
+    /**
      * Synthesizes [text] to spoken Mandarin using the Qwen3-TTS model and returns the raw audio
      * bytes (a WAV file) so the caller can play it back. The DashScope endpoint returns a temporary
      * URL to the generated audio, which this method downloads before returning.
@@ -164,6 +212,50 @@ class QwenService(
             "EXACTLY these sentences and words. The correct choice at every turn must be a " +
             "sentence the learner can build from the patterns and words above, so they succeed by " +
             "using what they just studied."
+    }
+
+    /**
+     * Frames a single open-ended turn for the model: the scene, who the other person is, their last
+     * line, what the learner is trying to do this turn, the conversation so far, and finally the
+     * exact words the speech recognizer heard the learner say. The model uses all of this to react
+     * in character to what the learner ACTUALLY said.
+     */
+    private fun missionReplyUserPrompt(
+        mission: Mission,
+        turn: MissionTurn,
+        transcript: String,
+        languages: LanguagePair,
+        history: List<MissionReply>,
+    ): String {
+        val target = languages.target.displayName
+        val source = languages.source.displayName
+        val builder = StringBuilder()
+        builder.append("Scene ($source): \"${mission.setting}\".\n")
+        if (mission.role.isNotBlank()) {
+            builder.append("You are role-playing as: ${mission.role}.\n")
+        }
+        if (turn.speaker.isNotBlank()) {
+            builder.append("Your last line to the learner ($target): \"${turn.speaker}\".\n")
+        }
+        if (turn.prompt.isNotBlank()) {
+            builder.append("What the learner is trying to do this turn ($source): \"${turn.prompt}\".\n")
+        }
+        if (history.isNotEmpty()) {
+            builder.append("Conversation so far (oldest first):\n")
+            history.forEach { exchange ->
+                builder.append("- Learner said ($source): \"${exchange.translation}\" → ")
+                builder.append("You replied ($target): \"${exchange.reply}\"\n")
+            }
+        }
+        builder.append(
+            "The learner just spoke this $target reply (as heard by speech recognition): " +
+                "\"$transcript\".\n",
+        )
+        builder.append(
+            "Translate exactly what the learner said into $source, then reply in character in " +
+                "$target as the other person, reacting to what they actually said.",
+        )
+        return builder.toString()
     }
 
     companion object {
@@ -389,6 +481,50 @@ class QwenService(
               forward). For the wrong choices, gently explain what went wrong. Never leave the
               correct choice's "reply" empty.
             - The correct choices must come from the sentences and words the learner studied.
+        """.trimIndent()
+        }
+
+        private fun missionReplySystemPrompt(languages: LanguagePair): String {
+            val target = languages.target.displayName
+            val source = languages.source.displayName
+            val script = languages.target.scriptDescription
+            val romanizationField = if (languages.target.usesRomanization) {
+                "a romanization (pronunciation guide) for \"reply\""
+            } else {
+                "leave empty (\"\"); $target needs no separate romanization"
+            }
+            return """
+            You are role-playing as a real person in a $target conversation with a learner who
+            already knows $source and is practicing $target by speaking freely. The learner just
+            spoke a spontaneous reply (transcribed by speech recognition, so it may contain small
+            errors or be only a fragment). You react like a real person would in this moment — there
+            is no "correct" answer; judge plausibility and effort, never right vs. wrong.
+
+            Your job each turn:
+            1. Translate EXACTLY what the learner said into natural $source, so they can confirm they
+               said what they meant (preserve their actual meaning, do not "fix" or improve it).
+            2. Reply in character, in $target, in a way that is logically contingent on what the
+               learner ACTUALLY said — react with agreement, surprise, a question, a counter-offer,
+               etc., advancing the scene as if it were a real event. Keep it short, natural, and
+               beginner friendly.
+
+            Handle these cases gracefully:
+            - If the learner was silent, spoke in $source instead of $target, or went wildly
+              off-topic, set "onTopic" to false and make your "reply" gently steer them back, e.g.
+              ask them to repeat that in $target.
+            - If the reply is only a partial sentence or fragment, still react plausibly to the most
+              likely intended meaning and set "onTopic" to true.
+
+            Write all $target text in $script. Write all $source text in $source.
+
+            Respond with ONLY a single JSON object, no markdown, matching this schema exactly:
+            {
+              "translation": string,        // what the learner said, translated into $source
+              "reply": string,              // the other person's in-character response, in $target ($script)
+              "replyRomanization": string,  // $romanizationField
+              "replyTranslation": string,   // the $source meaning of "reply"
+              "onTopic": boolean            // false only when the learner was silent, used $source, or went wildly off-context
+            }
         """.trimIndent()
         }
     }

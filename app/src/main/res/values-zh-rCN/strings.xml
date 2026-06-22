@@ -50,6 +50,7 @@
     <!-- Study screen -->
     <string name="study_no_content">没有可学习的内容。</string>
     <string name="study_try_mission">尝试一个真实任务</string>
+    <string name="study_missions">任务</string>
     <string name="study_words">词语</string>
     <string name="study_breakdown">详解</string>
     <string name="study_play_sentence">播放句子</string>
@@ -81,6 +82,25 @@
     <string name="mission_pick_what_to_say">选择你要说的话。</string>
     <string name="mission_next">下一个任务</string>
     <string name="mission_continue">继续</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">你会说什么？</string>
+    <string name="mission_reply_hint">点击“现在说”并大声说出来。</string>
+    <string name="mission_reply_speak">现在说</string>
+    <string name="mission_reply_stop">停止录音</string>
+    <string name="mission_reply_recording">正在录音……请说话。</string>
+    <string name="mission_reply_processing">正在聆听你的回答……</string>
+    <string name="mission_reply_your_reply">你的回答</string>
+    <string name="mission_reply_translation">翻译</string>
+    <string name="mission_reply_npc_response">对方的回应</string>
+    <string name="mission_reply_listen_npc">收听对方的回答</string>
+    <string name="mission_reply_say_back">回复</string>
+    <string name="mission_reply_retry">重新回答</string>
+    <string name="mission_reply_continue">继续任务</string>
+    <string name="mission_reply_nothing_heard">（没有听到）</string>
+    <string name="mission_reply_no_speech">没听清。请点击“现在说”并大声一点再试一次。</string>
+    <string name="mission_reply_permission_needed">需要麦克风权限才能说出你的回答。</string>
+    <string name="mission_reply_failed">无法处理你的回答，请重试。</string>
 
     <!-- Text-to-speech availability dialog -->
     <string name="tts_voice_unavailable_title">%1$s语音不可用</string>

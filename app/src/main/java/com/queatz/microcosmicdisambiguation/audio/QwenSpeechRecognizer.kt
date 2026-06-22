@@ -24,9 +24,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Streams microphone audio to the Qwen (Alibaba DashScope) real-time speech recognition service and
- * surfaces a live, growing transcript. The Paraformer real-time model recognizes both Chinese and
- * English (via `language_hints`), so the home screen's "IRL situation" field can be dictated in
- * either language.
+ * surfaces a live, growing transcript. The Fun-ASR real-time model recognizes Chinese, English, and
+ * Japanese (biased via `language_hints`); for other session languages the hint is dropped and the
+ * model auto-detects rather than mis-transcribing as an unsupported language.
  *
  * The flow follows DashScope's WebSocket protocol: connect, send a `run-task` instruction, wait for
  * `task-started`, then push raw 16 kHz mono PCM frames captured from [AudioRecord] while consuming
@@ -291,7 +291,12 @@ class QwenSpeechRecognizer(
                 parameters = AsrParameters(
                     format = "pcm",
                     sampleRate = SAMPLE_RATE,
-                    languageHints = languageHints.takeIf { it.isNotEmpty() },
+                    // Drop codes the model can't recognize (e.g. Vietnamese, Burmese); an
+                    // unsupported hint would be ignored or fail, so we let the model auto-detect
+                    // instead of mis-transcribing as the wrong language.
+                    languageHints = languageHints
+                        .filter { it in SUPPORTED_LANGUAGE_HINTS }
+                        .takeIf { it.isNotEmpty() },
                 ),
                 input = AsrInput(),
             ),
@@ -315,6 +320,14 @@ class QwenSpeechRecognizer(
         private const val MODEL = "fun-asr-realtime"
 
         private const val SAMPLE_RATE = 16_000
+
+        /**
+         * The `language_hints` codes the [MODEL] can actually bias toward. Codes outside this set
+         * are dropped so the model falls back to automatic language detection rather than failing
+         * or defaulting to the wrong language.
+         */
+        private val SUPPORTED_LANGUAGE_HINTS =
+            setOf("zh", "en", "ja")
 
         /** ~100 ms of 16 kHz mono 16-bit PCM audio per streamed frame. */
         private const val CHUNK_BYTES = 3_200

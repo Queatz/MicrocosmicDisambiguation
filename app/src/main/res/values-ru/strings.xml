@@ -50,6 +50,7 @@
     <!-- Study screen -->
     <string name="study_no_content">Нет материала для изучения.</string>
     <string name="study_try_mission">Попробовать реальную миссию</string>
+    <string name="study_missions">Миссии</string>
     <string name="study_words">Слова</string>
     <string name="study_breakdown">Разбор</string>
     <string name="study_play_sentence">Воспроизвести предложение</string>
@@ -82,6 +83,25 @@
     <string name="mission_pick_what_to_say">Выберите, что сказать.</string>
     <string name="mission_next">Следующая миссия</string>
     <string name="mission_continue">Продолжить</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">Что бы вы сказали?</string>
+    <string name="mission_reply_hint">Нажмите «Говорить» и произнесите вслух.</string>
+    <string name="mission_reply_speak">Говорить</string>
+    <string name="mission_reply_stop">Остановить запись</string>
+    <string name="mission_reply_recording">Запись… говорите.</string>
+    <string name="mission_reply_processing">Слушаем ваш ответ…</string>
+    <string name="mission_reply_your_reply">Ваш ответ</string>
+    <string name="mission_reply_translation">Перевод</string>
+    <string name="mission_reply_npc_response">Их ответ</string>
+    <string name="mission_reply_listen_npc">Прослушать их ответ</string>
+    <string name="mission_reply_say_back">Ответить</string>
+    <string name="mission_reply_retry">Повторить ответ</string>
+    <string name="mission_reply_continue">Продолжить миссию</string>
+    <string name="mission_reply_nothing_heard">(ничего не услышано)</string>
+    <string name="mission_reply_no_speech">Не удалось расслышать. Нажмите «Говорить» и попробуйте ещё раз немного громче.</string>
+    <string name="mission_reply_permission_needed">Для ответа голосом нужен доступ к микрофону.</string>
+    <string name="mission_reply_failed">Не удалось обработать ваш ответ. Попробуйте ещё раз.</string>
 
     <!-- Text-to-speech availability dialog -->
     <string name="tts_voice_unavailable_title">Голос для языка «%1$s» недоступен</string>

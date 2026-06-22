@@ -2,6 +2,7 @@ package com.queatz.microcosmicdisambiguation
 
 import com.queatz.microcosmicdisambiguation.data.Mission
 import com.queatz.microcosmicdisambiguation.data.MissionChoice
+import com.queatz.microcosmicdisambiguation.data.MissionReply
 import com.queatz.microcosmicdisambiguation.data.MissionSet
 import com.queatz.microcosmicdisambiguation.data.MissionTurn
 import kotlinx.serialization.json.Json
@@ -167,5 +168,37 @@ class MissionLogicTest {
         val choices = set.missions.single().turns.single().choices
         assertEquals(1, choices.size)
         assertEquals("你好", choices.single().hanzi)
+    }
+
+    @Test
+    fun missionReply_parsesFromModelJson() {
+        val content = """
+            {
+              "translation": "I'd like to buy two bananas, please.",
+              "reply": "好的，两根香蕉，一共五块钱。",
+              "replyRomanization": "hǎo de, liǎng gēn xiāngjiāo, yígòng wǔ kuài qián.",
+              "replyTranslation": "Sure, two bananas, five yuan in total.",
+              "onTopic": true
+            }
+        """.trimIndent()
+
+        val reply = json.decodeFromString(MissionReply.serializer(), content)
+
+        assertEquals("I'd like to buy two bananas, please.", reply.translation)
+        assertEquals("好的，两根香蕉，一共五块钱。", reply.reply)
+        assertEquals("Sure, two bananas, five yuan in total.", reply.replyTranslation)
+        assertTrue(reply.onTopic)
+    }
+
+    @Test
+    fun missionReply_defaultsAreSafeWhenFieldsMissing() {
+        // The model may omit fields (e.g. romanization for Latin-script languages); parsing must not
+        // crash and missing fields fall back to safe defaults.
+        val reply = json.decodeFromString(MissionReply.serializer(), """{ "reply": "Hola" }""")
+
+        assertEquals("Hola", reply.reply)
+        assertEquals("", reply.translation)
+        assertEquals("", reply.replyRomanization)
+        assertTrue(reply.onTopic)
     }
 }

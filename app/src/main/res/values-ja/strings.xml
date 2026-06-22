@@ -50,6 +50,7 @@
     <!-- Study screen -->
     <string name="study_no_content">学習できる内容がありません。</string>
     <string name="study_try_mission">実際のミッションに挑戦</string>
+    <string name="study_missions">ミッション</string>
     <string name="study_words">単語</string>
     <string name="study_breakdown">解説</string>
     <string name="study_play_sentence">文を再生</string>
@@ -82,6 +83,25 @@
     <string name="mission_pick_what_to_say">何を言うか選んでください。</string>
     <string name="mission_next">次のミッション</string>
     <string name="mission_continue">続ける</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">何と言いますか？</string>
+    <string name="mission_reply_hint">「話す」を押して声に出して言ってください。</string>
+    <string name="mission_reply_speak">話す</string>
+    <string name="mission_reply_stop">録音を停止</string>
+    <string name="mission_reply_recording">録音中… 今話してください。</string>
+    <string name="mission_reply_processing">あなたの返事を聞いています…</string>
+    <string name="mission_reply_your_reply">あなたの返事</string>
+    <string name="mission_reply_translation">翻訳</string>
+    <string name="mission_reply_npc_response">相手の反応</string>
+    <string name="mission_reply_listen_npc">相手の返事を聞く</string>
+    <string name="mission_reply_say_back">返事</string>
+    <string name="mission_reply_retry">返事をやり直す</string>
+    <string name="mission_reply_continue">ミッションを続ける</string>
+    <string name="mission_reply_nothing_heard">（何も聞こえませんでした）</string>
+    <string name="mission_reply_no_speech">うまく聞き取れませんでした。「話す」を押して、もう少し大きな声でもう一度お試しください。</string>
+    <string name="mission_reply_permission_needed">返事を話すにはマイクの許可が必要です。</string>
+    <string name="mission_reply_failed">返事を処理できませんでした。もう一度お試しください。</string>
 
     <!-- Text-to-speech availability dialog -->
     <string name="tts_voice_unavailable_title">%1$s の音声は利用できません</string>

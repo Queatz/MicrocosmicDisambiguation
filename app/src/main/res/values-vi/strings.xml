@@ -50,6 +50,7 @@
     <!-- Study screen -->
     <string name="study_no_content">Không có nội dung học.</string>
     <string name="study_try_mission">Thử một nhiệm vụ thực tế</string>
+    <string name="study_missions">Nhiệm vụ</string>
     <string name="study_words">Từ vựng</string>
     <string name="study_breakdown">Phân tích</string>
     <string name="study_play_sentence">Phát câu</string>
@@ -82,6 +83,25 @@
     <string name="mission_pick_what_to_say">Chọn điều bạn muốn nói.</string>
     <string name="mission_next">Nhiệm vụ tiếp theo</string>
     <string name="mission_continue">Tiếp tục</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">Bạn sẽ nói gì?</string>
+    <string name="mission_reply_hint">Nhấn “Nói ngay” và nói to.</string>
+    <string name="mission_reply_speak">Nói ngay</string>
+    <string name="mission_reply_stop">Dừng ghi âm</string>
+    <string name="mission_reply_recording">Đang ghi… hãy nói.</string>
+    <string name="mission_reply_processing">Đang nghe câu trả lời của bạn…</string>
+    <string name="mission_reply_your_reply">Câu trả lời của bạn</string>
+    <string name="mission_reply_translation">Bản dịch</string>
+    <string name="mission_reply_npc_response">Phản hồi của họ</string>
+    <string name="mission_reply_listen_npc">Nghe câu trả lời của họ</string>
+    <string name="mission_reply_say_back">Trả lời</string>
+    <string name="mission_reply_retry">Trả lời lại</string>
+    <string name="mission_reply_continue">Tiếp tục nhiệm vụ</string>
+    <string name="mission_reply_nothing_heard">(không nghe thấy gì)</string>
+    <string name="mission_reply_no_speech">Không nghe rõ. Nhấn “Nói ngay” và thử lại to hơn một chút.</string>
+    <string name="mission_reply_permission_needed">Cần quyền micrô để nói câu trả lời của bạn.</string>
+    <string name="mission_reply_failed">Không thể xử lý câu trả lời của bạn. Vui lòng thử lại.</string>
 
     <!-- Text-to-speech availability dialog -->
     <string name="tts_voice_unavailable_title">Giọng nói %1$s không khả dụng</string>

@@ -229,6 +229,8 @@ fun MicrocosmicDisambiguationApp() {
                     title = remember(id) { viewModel.title(id) },
                     state = missionState,
                     speaker = speaker,
+                    qwenService = viewModel.qwenService,
+                    languages = remember(id) { viewModel.languagePairOf(id) },
                     onClose = { navController.popBackStack() },
                     onRetry = {
                         viewModel.resetMissions()
