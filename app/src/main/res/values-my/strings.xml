@@ -56,6 +56,21 @@
     <string name="study_word_by_word">တစ်လုံးချင်း</string>
     <string name="study_next_word">နောက်စကားလုံး</string>
 
+    <string name="study_pronounce">အသံထွက် လေ့ကျင့်ရန်</string>
+    <string name="study_pronounce_word">\"%1$s\" အသံထွက် လေ့ကျင့်ရန်</string>
+    <string name="study_pronounce_title">အသံထွက် လေ့ကျင့်ခြင်း</string>
+    <string name="study_pronounce_start">အသံဖမ်းခြင်း စတင်ရန်</string>
+    <string name="study_pronounce_stop">အသံဖမ်းခြင်း ရပ်ရန်</string>
+    <string name="study_pronounce_listening">နားထောင်နေသည်… ယခု ပြောပါ။</string>
+    <string name="study_pronounce_processing">သင့်အသံထွက်ကို စစ်ဆေးနေသည်…</string>
+    <string name="study_pronounce_you_said">သင်ပြောခဲ့သည်</string>
+    <string name="study_pronounce_nothing_heard">(ဘာမှ မကြားရပါ)</string>
+    <string name="study_pronounce_accuracy">တိကျမှု - %1$d%%</string>
+    <string name="study_pronounce_play_comparison">နှိုင်းယှဉ်ချက် ဖွင့်ရန်</string>
+    <string name="study_pronounce_retry">ထပ်စမ်းကြည့်ရန်</string>
+    <string name="study_pronounce_no_speech">မကြားလိုက်ပါ။ အသံကို နည်းနည်းကျယ်ကျယ် ထပ်ဖမ်းကြည့်ပါ။</string>
+    <string name="study_pronounce_permission_needed">အသံထွက် လေ့ကျင့်ရန် မိုက်ခရိုဖုန်း ခွင့်ပြုချက် လိုအပ်သည်။</string>
+
     <!-- Mission screen -->
     <string name="mission_building">သင့်တာဝန်များကို ဖန်တီးနေသည်…</string>
     <string name="mission_building_subtitle">သင်လေ့လာထားသည်များဖြင့် ဖြတ်သန်းနိုင်သော တကယ့်အခြေအနေများ။</string>

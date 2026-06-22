@@ -56,6 +56,21 @@
     <string name="study_word_by_word">Từng từ một</string>
     <string name="study_next_word">Từ tiếp theo</string>
 
+    <string name="study_pronounce">Luyện phát âm</string>
+    <string name="study_pronounce_word">Luyện phát âm \"%1$s\"</string>
+    <string name="study_pronounce_title">Luyện phát âm</string>
+    <string name="study_pronounce_start">Bắt đầu ghi âm</string>
+    <string name="study_pronounce_stop">Dừng ghi âm</string>
+    <string name="study_pronounce_listening">Đang nghe… hãy nói đi.</string>
+    <string name="study_pronounce_processing">Đang kiểm tra phát âm của bạn…</string>
+    <string name="study_pronounce_you_said">Bạn đã nói</string>
+    <string name="study_pronounce_nothing_heard">(không nghe thấy gì)</string>
+    <string name="study_pronounce_accuracy">Độ chính xác: %1$d%%</string>
+    <string name="study_pronounce_play_comparison">Phát so sánh</string>
+    <string name="study_pronounce_retry">Thử lại</string>
+    <string name="study_pronounce_no_speech">Không nghe rõ. Hãy ghi âm lại to hơn một chút.</string>
+    <string name="study_pronounce_permission_needed">Cần quyền micrô để luyện phát âm.</string>
+
     <!-- Mission screen -->
     <string name="mission_building">Đang tạo nhiệm vụ cho bạn…</string>
     <string name="mission_building_subtitle">Các tình huống thực tế bạn có thể vượt qua bằng những gì đã học.</string>

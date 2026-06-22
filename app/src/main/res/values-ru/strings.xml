@@ -56,6 +56,21 @@
     <string name="study_word_by_word">По словам</string>
     <string name="study_next_word">Следующее слово</string>
 
+    <string name="study_pronounce">Практика произношения</string>
+    <string name="study_pronounce_word">Практиковать произношение «%1$s»</string>
+    <string name="study_pronounce_title">Практика произношения</string>
+    <string name="study_pronounce_start">Начать запись</string>
+    <string name="study_pronounce_stop">Остановить запись</string>
+    <string name="study_pronounce_listening">Слушаю… говорите.</string>
+    <string name="study_pronounce_processing">Проверяем ваше произношение…</string>
+    <string name="study_pronounce_you_said">Вы сказали</string>
+    <string name="study_pronounce_nothing_heard">(ничего не услышано)</string>
+    <string name="study_pronounce_accuracy">Точность: %1$d%%</string>
+    <string name="study_pronounce_play_comparison">Воспроизвести сравнение</string>
+    <string name="study_pronounce_retry">Повторить</string>
+    <string name="study_pronounce_no_speech">Не удалось расслышать. Запишите ещё раз немного громче.</string>
+    <string name="study_pronounce_permission_needed">Для практики произношения нужен доступ к микрофону.</string>
+
     <!-- Mission screen -->
     <string name="mission_building">Создаём ваши миссии…</string>
     <string name="mission_building_subtitle">Реальные ситуации, которые можно пройти с помощью изученного.</string>

@@ -55,6 +55,20 @@
     <string name="study_play_sentence">播放句子</string>
     <string name="study_word_by_word">逐词播放</string>
     <string name="study_next_word">下一个词</string>
+    <string name="study_pronounce">练习发音</string>
+    <string name="study_pronounce_word">练习发音 \"%1$s\"</string>
+    <string name="study_pronounce_title">发音练习</string>
+    <string name="study_pronounce_start">开始录音</string>
+    <string name="study_pronounce_stop">停止录音</string>
+    <string name="study_pronounce_listening">正在聆听……请说话。</string>
+    <string name="study_pronounce_processing">正在检查你的发音…</string>
+    <string name="study_pronounce_you_said">你说的是</string>
+    <string name="study_pronounce_nothing_heard">（未听到内容）</string>
+    <string name="study_pronounce_accuracy">准确度：%1$d%%</string>
+    <string name="study_pronounce_play_comparison">播放对比</string>
+    <string name="study_pronounce_retry">重试</string>
+    <string name="study_pronounce_no_speech">没听清。请再大声一点重新录音。</string>
+    <string name="study_pronounce_permission_needed">练习发音需要麦克风权限。</string>
 
     <!-- Mission screen -->
     <string name="mission_building">正在构建你的任务…</string>

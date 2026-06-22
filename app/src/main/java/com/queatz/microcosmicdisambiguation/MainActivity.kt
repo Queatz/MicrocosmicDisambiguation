@@ -207,9 +207,11 @@ fun MicrocosmicDisambiguationApp() {
                 if (guide == null) {
                     navController.popBackStack()
                 } else {
+                    val sessionLanguage = remember(id) { viewModel.languagePairOf(id).target }
                     StudyScreen(
                         guide = guide,
                         speaker = speaker,
+                        language = sessionLanguage,
                         onClose = { navController.popBackStack() },
                         onStartMissions = { navController.navigate("$ROUTE_MISSION/$id") },
                     )

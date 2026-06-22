@@ -56,6 +56,21 @@
     <string name="study_word_by_word">単語ごとに再生</string>
     <string name="study_next_word">次の単語</string>
 
+    <string name="study_pronounce">発音を練習</string>
+    <string name="study_pronounce_word">「%1$s」の発音を練習</string>
+    <string name="study_pronounce_title">発音練習</string>
+    <string name="study_pronounce_start">録音を開始</string>
+    <string name="study_pronounce_stop">録音を停止</string>
+    <string name="study_pronounce_listening">聞いています…話してください。</string>
+    <string name="study_pronounce_processing">発音を確認しています…</string>
+    <string name="study_pronounce_you_said">あなたの発話</string>
+    <string name="study_pronounce_nothing_heard">（何も聞こえませんでした）</string>
+    <string name="study_pronounce_accuracy">正確さ：%1$d%%</string>
+    <string name="study_pronounce_play_comparison">比較を再生</string>
+    <string name="study_pronounce_retry">もう一度</string>
+    <string name="study_pronounce_no_speech">聞き取れませんでした。もう少し大きな声で録音し直してください。</string>
+    <string name="study_pronounce_permission_needed">発音練習にはマイクの権限が必要です。</string>
+
     <!-- Mission screen -->
     <string name="mission_building">ミッションを作成中…</string>
     <string name="mission_building_subtitle">学んだことで切り抜けられる実際の状況です。</string>

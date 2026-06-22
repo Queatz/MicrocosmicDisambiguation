@@ -56,6 +56,21 @@
     <string name="study_word_by_word">단어별 재생</string>
     <string name="study_next_word">다음 단어</string>
 
+    <string name="study_pronounce">발음 연습</string>
+    <string name="study_pronounce_word">\"%1$s\" 발음 연습</string>
+    <string name="study_pronounce_title">발음 연습</string>
+    <string name="study_pronounce_start">녹음 시작</string>
+    <string name="study_pronounce_stop">녹음 중지</string>
+    <string name="study_pronounce_listening">듣고 있어요… 지금 말하세요.</string>
+    <string name="study_pronounce_processing">발음을 확인하는 중…</string>
+    <string name="study_pronounce_you_said">말한 내용</string>
+    <string name="study_pronounce_nothing_heard">(들리지 않음)</string>
+    <string name="study_pronounce_accuracy">정확도: %1$d%%</string>
+    <string name="study_pronounce_play_comparison">비교 재생</string>
+    <string name="study_pronounce_retry">다시 시도</string>
+    <string name="study_pronounce_no_speech">잘 들리지 않았어요. 조금 더 크게 다시 녹음해 보세요.</string>
+    <string name="study_pronounce_permission_needed">발음을 연습하려면 마이크 권한이 필요합니다.</string>
+
     <!-- Mission screen -->
     <string name="mission_building">미션을 만드는 중…</string>
     <string name="mission_building_subtitle">학습한 내용으로 헤쳐 나갈 수 있는 실제 상황입니다.</string>

@@ -278,7 +278,12 @@ private fun MainSection(
         }
 
         Button(
-            onClick = { onStudy(situation.text) },
+            onClick = {
+                if (isListening) {
+                    toggleListening()
+                }
+                onStudy(situation.text)
+            },
             enabled = situation.text.isNotBlank() && !state.isGenerating,
             shape = RoundedCornerShape(24.dp),
             contentPadding = PaddingValues(vertical = 16.dp),

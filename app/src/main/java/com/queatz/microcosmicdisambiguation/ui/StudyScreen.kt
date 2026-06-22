@@ -21,9 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,6 +69,7 @@ import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.Alignment as AlignmentChunk
 import com.queatz.microcosmicdisambiguation.data.alignedEnglishRange
 import com.queatz.microcosmicdisambiguation.data.BLANK
+import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.SentenceStructure
 import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import com.queatz.microcosmicdisambiguation.data.StudyWord
@@ -77,6 +82,7 @@ import kotlin.math.roundToInt
 fun StudyScreen(
     guide: StudyGuide,
     speaker: TtsEngine,
+    language: Language,
     onClose: () -> Unit,
     onStartMissions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -108,6 +114,7 @@ fun StudyScreen(
         SentencePage(
             structure = structure,
             speaker = speaker,
+            language = language,
             modifier = Modifier.weight(1f),
         )
 
@@ -142,6 +149,7 @@ fun StudyScreen(
 private fun SentencePage(
     structure: SentenceStructure,
     speaker: TtsEngine,
+    language: Language,
     modifier: Modifier = Modifier,
 ) {
     val segments = remember(structure.template) { structure.template.split(BLANK) }
@@ -188,6 +196,9 @@ private fun SentencePage(
     // index of the word currently focused by the step-through "word by word" player, or null when
     // that mode is inactive
     var wordByWordIndex by remember(structure) { mutableStateOf<Int?>(null) }
+    // the sentence or word the learner is currently practicing pronouncing, or null when the
+    // pronunciation-practice modal is closed
+    var practiceTarget by remember(structure) { mutableStateOf<String?>(null) }
 
     fun assembledSentence(): String =
         assembleSentence(structure.template, slots.map { it?.hanzi })
@@ -394,6 +405,7 @@ private fun SentencePage(
                     wordByWordIndex = null
                     speakingRange = null
                 },
+                onPractice = { practiceTarget = originalSentence() },
             )
 
             Text(
@@ -443,6 +455,7 @@ private fun SentencePage(
                         BreakdownRow(
                             entry = entry,
                             onTap = { speaker.speak(entry.hanzi) },
+                            onPractice = { practiceTarget = entry.hanzi },
                         )
                     }
                 }
@@ -475,6 +488,17 @@ private fun SentencePage(
                 WordChipContent(word = word, elevated = true)
             }
         }
+
+        // The pronunciation-practice modal, opened from the sentence's play controls or any word
+        // in the breakdown.
+        practiceTarget?.let { target ->
+            PronunciationPracticeDialog(
+                target = target,
+                language = language,
+                speaker = speaker,
+                onDismiss = { practiceTarget = null },
+            )
+        }
     }
 }
 
@@ -491,6 +515,7 @@ private fun PlayControls(
     onStartWordByWord: () -> Unit,
     onNextWord: () -> Unit,
     onStopWordByWord: () -> Unit,
+    onPractice: () -> Unit,
 ) {
     if (wordByWordIndex == null) {
         Row(
@@ -506,6 +531,14 @@ private fun PlayControls(
                 modifier = Modifier.weight(1f),
             ) {
                 Text(stringResource(R.string.study_word_by_word))
+            }
+            // Speak the sentence yourself and get instant pronunciation feedback.
+            IconButton(onClick = onPractice) {
+                Icon(
+                    imageVector = Icons.Default.RecordVoiceOver,
+                    contentDescription = stringResource(R.string.study_pronounce),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     } else {
@@ -650,6 +683,7 @@ private fun WordChip(
 private fun BreakdownRow(
     entry: WordBreakdown,
     onTap: () -> Unit,
+    onPractice: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -703,6 +737,14 @@ private fun BreakdownRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+            // Practice pronouncing this individual word.
+            IconButton(onClick = onPractice) {
+                Icon(
+                    imageVector = Icons.Default.RecordVoiceOver,
+                    contentDescription = stringResource(R.string.study_pronounce_word, entry.hanzi),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
         }
     }
