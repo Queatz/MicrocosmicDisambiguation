@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Streams microphone audio to the Qwen (Alibaba DashScope) real-time speech recognition service and
- * surfaces a live, growing transcript. The Qwen3-ASR Flash real-time model recognizes a wide range
+ * surfaces a live, growing transcript. The Fun-ASR real-time model recognizes a wide range
  * of languages (Chinese, English, Cantonese, Japanese, Korean, Russian, Vietnamese, German, French,
  * and many more), biased via the optional `language` hint, so the dictated text matches the language
  * the learner is speaking. Codes the model can't recognize (e.g. Burmese) are dropped so the model
@@ -99,7 +99,7 @@ class QwenSpeechRecognizer(
         notifyListening(true)
 
         val request = Request.Builder()
-            .url("$ENDPOINT?model=$MODEL")
+            .url("${QwenService.REALTIME_ENDPOINT}?model=${QwenService.REALTIME_ASR_MODEL}")
             .header("Authorization", "Bearer $apiKey")
             .header("OpenAI-Beta", "realtime=v1")
             .build()
@@ -313,16 +313,12 @@ class QwenSpeechRecognizer(
     companion object {
         private const val TAG = "QwenSpeechRecognizer"
 
-        private const val ENDPOINT =
-            "wss://dashscope-intl.aliyuncs.com/api-ws/v1/realtime"
-        private const val MODEL = "qwen3-asr-flash-realtime"
-
         private const val SAMPLE_RATE = 16_000
 
         /**
-         * The `language` codes the [MODEL] can bias toward. Codes outside this set (e.g. Burmese)
-         * are dropped so the model falls back to automatic language detection rather than failing
-         * or defaulting to the wrong language.
+         * The `language` codes the [QwenService.REALTIME_ASR_MODEL] can bias toward. Codes outside
+         * this set (e.g. Burmese) are dropped so the model falls back to automatic language
+         * detection rather than failing or defaulting to the wrong language.
          */
         private val SUPPORTED_LANGUAGES = setOf(
             "zh", "en", "yue", "ja", "ko", "ru", "vi", "de", "fr", "es", "pt",

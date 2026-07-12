@@ -31,6 +31,9 @@ private const val RECORDINGS = "recordings"
 private const val KEY_TTS_MODE = "tts_mode"
 private const val KEY_SOURCE_LANGUAGE = "source_language"
 private const val KEY_TARGET_LANGUAGE = "target_language"
+private const val KEY_WELCOME_BANNER_DISMISSED = "welcome_banner_dismissed"
+private const val KEY_COSY_VOICE_ID = "cosy_voice_id"
+private const val KEY_CLONED_VOICES = "cloned_voices"
 
 /**
  * A tiny coroutine-friendly wrapper over the browser IndexedDB, bridging the callback-based JS API
@@ -153,6 +156,7 @@ private data class SessionRow(
     val sourceLang: String = "",
     val targetLang: String = "",
     val createdAt: Long = 0L,
+    val played: List<Int> = emptyList(),
 )
 
 private fun SessionRow.toSession(): StudySession = StudySession(
@@ -167,6 +171,7 @@ private fun SessionRow.toSession(): StudySession = StudySession(
         target = Language.fromName(targetLang, LanguagePair.Default.target),
     ),
     createdAt = createdAt,
+    playedStructures = played.toSet(),
 )
 
 /**
@@ -207,6 +212,13 @@ class IndexedDbStudyStore : StudyStore {
     override suspend fun saveMissions(id: Long, missions: MissionSet) {
         val existing = IndexedDb.get(SESSIONS, id) ?: return
         val row = json.decodeFromString(SessionRow.serializer(), existing).copy(missions = missions)
+        IndexedDb.put(SESSIONS, json.encodeToString(SessionRow.serializer(), row))
+    }
+
+    override suspend fun savePlayedStructures(id: Long, playedStructures: Set<Int>) {
+        val existing = IndexedDb.get(SESSIONS, id) ?: return
+        val row = json.decodeFromString(SessionRow.serializer(), existing)
+            .copy(played = playedStructures.sorted())
         IndexedDb.put(SESSIONS, json.encodeToString(SessionRow.serializer(), row))
     }
 
@@ -273,6 +285,9 @@ class IndexedDbSettingsStore private constructor(
     initialTts: TtsMode,
     initialSource: Language,
     initialTarget: Language,
+    initialWelcomeBannerDismissed: Boolean,
+    initialCosyVoiceId: String?,
+    initialClonedVoicesJson: String,
 ) : SettingsStore {
 
     private val scope = MainScope()
@@ -295,6 +310,24 @@ class IndexedDbSettingsStore private constructor(
             persist(KEY_TARGET_LANGUAGE, value.name)
         }
 
+    override var hasDismissedWelcomeBanner: Boolean = initialWelcomeBannerDismissed
+        set(value) {
+            field = value
+            persist(KEY_WELCOME_BANNER_DISMISSED, value.toString())
+        }
+
+    override var cosyVoiceId: String? = initialCosyVoiceId
+        set(value) {
+            field = value
+            if (value != null) persist(KEY_COSY_VOICE_ID, value)
+        }
+
+    override var clonedVoicesJson: String = initialClonedVoicesJson
+        set(value) {
+            field = value
+            persist(KEY_CLONED_VOICES, value)
+        }
+
     private fun persist(key: String, value: String) {
         scope.launch { IndexedDb.putSetting(key, value) }
     }
@@ -313,7 +346,18 @@ class IndexedDbSettingsStore private constructor(
                 IndexedDb.getSetting(KEY_TARGET_LANGUAGE),
                 LanguagePair.Default.target,
             )
-            return IndexedDbSettingsStore(ttsMode, source, target)
+            val welcomeBannerDismissed =
+                IndexedDb.getSetting(KEY_WELCOME_BANNER_DISMISSED)?.toBoolean() ?: false
+            val cosyVoiceId = IndexedDb.getSetting(KEY_COSY_VOICE_ID)
+            val clonedVoicesJson = IndexedDb.getSetting(KEY_CLONED_VOICES) ?: "[]"
+            return IndexedDbSettingsStore(
+                ttsMode,
+                source,
+                target,
+                welcomeBannerDismissed,
+                cosyVoiceId,
+                clonedVoicesJson,
+            )
         }
     }
 }

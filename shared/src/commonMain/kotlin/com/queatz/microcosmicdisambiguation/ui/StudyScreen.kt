@@ -92,11 +92,19 @@ import com.queatz.microcosmicdisambiguation.resources.study_words
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
+/**
+ * Hosts the whole study flow for a session: each sentence structure is preceded by its [PlayScreen]
+ * (the word coin game), then studied on a [SentencePage] — Play → Study → Play → Study … → Missions.
+ * The play round for a word group can only be skipped once it has been completed at least once
+ * ([playedStructures] holds the indices of the completed groups; [onStructurePlayed] persists one).
+ */
 @Composable
 fun StudyScreen(
     guide: StudyGuide,
     speaker: TtsEngine,
     language: Language,
+    playedStructures: Set<Int>,
+    onStructurePlayed: (structureIndex: Int) -> Unit,
     onClose: () -> Unit,
     onStartMissions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -109,8 +117,27 @@ fun StudyScreen(
     }
 
     var page by remember { mutableIntStateOf(0) }
+    // Every structure starts with its play round; studying begins once it is completed or skipped.
+    var playing by remember { mutableStateOf(true) }
     val structure = guide.structures[page]
     val isLast = page == guide.structures.lastIndex
+
+    if (playing) {
+        PlayScreen(
+            title = guide.title,
+            structure = structure,
+            roundNumber = page + 1,
+            roundCount = guide.structures.size,
+            language = language,
+            speaker = speaker,
+            canSkip = page in playedStructures,
+            onClose = onClose,
+            onCompleted = { onStructurePlayed(page) },
+            onContinue = { playing = false },
+            modifier = modifier,
+        )
+        return
+    }
 
     Column(
         modifier = modifier
@@ -156,7 +183,11 @@ fun StudyScreen(
                     Text(stringResource(Res.string.study_missions))
                 }
                 Button(
-                    onClick = { page++ },
+                    onClick = {
+                        page++
+                        // The next structure begins with its own play round.
+                        playing = true
+                    },
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(Res.string.next))

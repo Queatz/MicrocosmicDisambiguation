@@ -72,6 +72,25 @@
     <string name="study_pronounce_no_speech">聞き取れませんでした。もう少し大きな声で録音し直してください。</string>
     <string name="study_pronounce_permission_needed">発音練習にはマイクの権限が必要です。</string>
 
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">プレイ · ラウンド %1$d / %2$d</string>
+    <string name="play_intro_hint">コインをタップして意味をのぞいてみよう。</string>
+    <string name="play_game_hint">コインをタップして、その単語を声に出して言おう！</string>
+    <string name="play_meanings_hint">今度は意味に合う単語を言って、コインを裏返そう！</string>
+    <string name="play_lets_play">プレイしよう</string>
+    <string name="play_skip">スキップ</string>
+    <string name="play_continue">続ける</string>
+    <string name="play_progress">%1$d / %2$d 語</string>
+    <string name="play_say_word">声に出して言ってみよう！</string>
+    <string name="play_say_word_meaning">この単語は何？言ってみよう！</string>
+    <string name="play_listen">聞いてね…</string>
+    <string name="play_listening">聞いています…</string>
+    <string name="play_checking">確認中…</string>
+    <string name="play_try_again">おしい — コインをタップしてもう一度。</string>
+    <string name="play_all_done">全部言えました！🎉</string>
+    <string name="play_no_speech">聞き取れませんでした。もう少し大きな声で試してください。</string>
+    <string name="play_permission_needed">プレイするにはマイクの権限が必要です。</string>
+
     <!-- Mission screen -->
     <string name="mission_building">ミッションを作成中…</string>
     <string name="mission_building_subtitle">学んだことで切り抜けられる実際の状況です。</string>

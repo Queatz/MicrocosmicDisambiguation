@@ -72,6 +72,25 @@
     <string name="study_pronounce_no_speech">잘 들리지 않았어요. 조금 더 크게 다시 녹음해 보세요.</string>
     <string name="study_pronounce_permission_needed">발음을 연습하려면 마이크 권한이 필요합니다.</string>
 
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">플레이 · 라운드 %1$d / %2$d</string>
+    <string name="play_intro_hint">동전을 눌러 뜻을 살짝 확인해 보세요.</string>
+    <string name="play_game_hint">동전을 누르고 그 단어를 소리 내어 말해 보세요!</string>
+    <string name="play_meanings_hint">이제 각 뜻에 맞는 단어를 말해서 동전을 다시 뒤집어 보세요!</string>
+    <string name="play_lets_play">플레이하기</string>
+    <string name="play_skip">건너뛰기</string>
+    <string name="play_continue">계속</string>
+    <string name="play_progress">%1$d / %2$d 단어</string>
+    <string name="play_say_word">소리 내어 말해 보세요!</string>
+    <string name="play_say_word_meaning">이 단어는 뭘까요? 말해 보세요!</string>
+    <string name="play_listen">잘 들어 보세요…</string>
+    <string name="play_listening">듣는 중…</string>
+    <string name="play_checking">확인 중…</string>
+    <string name="play_try_again">아쉬워요 — 동전을 눌러 다시 시도해 보세요.</string>
+    <string name="play_all_done">전부 말했어요! 🎉</string>
+    <string name="play_no_speech">잘 들리지 않았어요. 조금 더 크게 다시 말해 보세요.</string>
+    <string name="play_permission_needed">플레이하려면 마이크 권한이 필요합니다.</string>
+
     <!-- Mission screen -->
     <string name="mission_building">미션을 만드는 중…</string>
     <string name="mission_building_subtitle">학습한 내용으로 헤쳐 나갈 수 있는 실제 상황입니다.</string>

@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The Qwen (DashScope) TTS service returns the generated audio file over a plain http:// OSS URL.
-  Android blocks cleartext traffic by default (API 28+), which silently prevented the AI voice from
-  ever downloading its audio. Allow cleartext only for the Alibaba OSS hosts that serve the audio.
+  Previously the Qwen (DashScope) TTS service returned generated audio over a plain http:// OSS
+  URL, requiring a cleartext exception for Alibaba's OSS hosts. CosyVoice now streams the audio
+  directly over the encrypted wss:// TTS connection (see QwenService.synthesizeSpeech), so no
+  cleartext traffic is needed anymore; this config intentionally allows none.
 -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">aliyuncs.com</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="false"/>
 </network-security-config>

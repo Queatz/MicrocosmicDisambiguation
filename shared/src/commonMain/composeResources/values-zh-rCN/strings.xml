@@ -71,6 +71,25 @@
     <string name="study_pronounce_no_speech">没听清。请再大声一点重新录音。</string>
     <string name="study_pronounce_permission_needed">练习发音需要麦克风权限。</string>
 
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">游戏 · 第 %1$d / %2$d 轮</string>
+    <string name="play_intro_hint">点一枚硬币，偷看它的意思。</string>
+    <string name="play_game_hint">点一枚硬币，大声说出它的单词！</string>
+    <string name="play_meanings_hint">现在说出每个意思对应的单词，把硬币翻回来！</string>
+    <string name="play_lets_play">开始游戏</string>
+    <string name="play_skip">跳过</string>
+    <string name="play_continue">继续</string>
+    <string name="play_progress">%1$d / %2$d 个单词</string>
+    <string name="play_say_word">大声说出来！</string>
+    <string name="play_say_word_meaning">这个词是什么？说出来吧！</string>
+    <string name="play_listen">仔细听…</string>
+    <string name="play_listening">正在听…</string>
+    <string name="play_checking">正在检查…</string>
+    <string name="play_try_again">还差一点 — 点硬币再试一次。</string>
+    <string name="play_all_done">全部说对啦！🎉</string>
+    <string name="play_no_speech">没听清。请再大声一点试试。</string>
+    <string name="play_permission_needed">需要麦克风权限才能玩。</string>
+
     <!-- Mission screen -->
     <string name="mission_building">正在构建你的任务…</string>
     <string name="mission_building_subtitle">用你所学的知识去应对真实情境。</string>

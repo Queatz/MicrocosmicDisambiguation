@@ -14,6 +14,9 @@
     <string name="try_again">Try again</string>
 
     <!-- Home screen -->
+    <string name="home_welcome_banner_title">🌍 Remember and learn to chat in any language quickly.</string>
+    <string name="home_welcome_banner_message">Perfect your listening and speaking skills using tiny microcosms too easily keep up with the natives.</string>
+    <string name="home_welcome_banner_dismiss">Dismiss</string>
     <string name="home_whats_going_on">What\'s going on?</string>
     <string name="home_describe_situation">Describe a real-life situation to study it.</string>
     <string name="home_irl_situation_placeholder">IRL situation</string>

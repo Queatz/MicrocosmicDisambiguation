@@ -24,4 +24,9 @@ data class SituationEntity(
     var sourceLang: String = "",
     /** The [Language.name] the learner is studying in this session (its target language). */
     var targetLang: String = "",
+    /**
+     * The indices of the guide's structures whose pre-study play round has been completed, cached
+     * as a JSON array of ints (blank until any round is completed).
+     */
+    var playedJson: String? = "",
 )

@@ -13,6 +13,8 @@ package com.queatz.microcosmicdisambiguation.data
  * @param missions the follow-up missions, generated lazily; null until first generated
  * @param languages the language pair this session was generated for
  * @param createdAt epoch milliseconds the session was created
+ * @param playedStructures indices of the guide's structures whose pre-study play round has been
+ *   completed at least once, so the play screen for those word groups becomes skippable
  */
 data class StudySession(
     val id: Long,
@@ -23,6 +25,7 @@ data class StudySession(
     val missions: MissionSet?,
     val languages: LanguagePair,
     val createdAt: Long,
+    val playedStructures: Set<Int> = emptySet(),
 )
 
 /**
@@ -63,6 +66,12 @@ interface StudyStore {
     /** Caches [missions] for the session with [id] so they are not regenerated next time. */
     suspend fun saveMissions(id: Long, missions: MissionSet)
 
+    /**
+     * Persists the set of structure indices whose play round has been completed for the session
+     * with [id], so those play screens can be skipped on later visits.
+     */
+    suspend fun savePlayedStructures(id: Long, playedStructures: Set<Int>)
+
     /** Removes the session with the given [id], if present. */
     suspend fun delete(id: Long)
 }
@@ -97,6 +106,26 @@ interface SettingsStore {
     /** The language the learner is studying. */
     var targetLanguage: Language
 
+    /** Whether the first-time welcome banner on the home screen has already been dismissed. */
+    var hasDismissedWelcomeBanner: Boolean
+
+    /**
+     * The `voice_id` of the CosyVoice "voice design" voice created for cloud TTS, or null if none
+     * has been created yet. `cosyvoice-v3.5-flash` (see [com.queatz.microcosmicdisambiguation.ai.QwenService])
+     * ships with no built-in system voices at all — a voice must first be generated once from a
+     * text description via the Voice Design API, and its returned id reused for every subsequent
+     * synthesis call. Persisting it here means that one-time (billed) creation call only ever
+     * happens once per install, not on every app launch.
+     */
+    var cosyVoiceId: String?
+
+    /**
+     * The learner's enrolled ("cloned") CosyVoice voices, serialized as a JSON array (see
+     * [ClonedVoices]). Stored as a single string so every platform only has to persist one more
+     * primitive value, exactly like [cosyVoiceId]. Defaults to an empty array (`"[]"`).
+     */
+    var clonedVoicesJson: String
+
     /** The current [LanguagePair] formed by [sourceLanguage] and [targetLanguage]. */
     var languagePair: LanguagePair
         get() = LanguagePair(source = sourceLanguage, target = targetLanguage)
@@ -104,4 +133,19 @@ interface SettingsStore {
             sourceLanguage = value.source
             targetLanguage = value.target
         }
+
+    /** The enrolled cloned voices, decoded from [clonedVoicesJson]. */
+    var clonedVoices: List<ClonedVoice>
+        get() = ClonedVoices.decode(clonedVoicesJson)
+        set(value) {
+            clonedVoicesJson = ClonedVoices.encode(value)
+        }
+
+    /**
+     * The `voice_id` of the enabled cloned voice to use for [language] when the AI speaker is
+     * active, or null when none is enrolled/enabled for it (so the caller falls back to the default
+     * voice). See [ClonedVoices.enabledVoiceIdFor].
+     */
+    fun enabledClonedVoiceId(language: Language): String? =
+        ClonedVoices.enabledVoiceIdFor(clonedVoices, language)
 }

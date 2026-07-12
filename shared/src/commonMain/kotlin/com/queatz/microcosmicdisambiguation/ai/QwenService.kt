@@ -10,19 +10,24 @@ import com.queatz.microcosmicdisambiguation.data.StudyGuide
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.get
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.readRawBytes
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.random.Random
 
 /**
  * Talks to the Qwen (Alibaba DashScope) chat completions API, which is OpenAI-compatible, to turn
@@ -30,11 +35,27 @@ import kotlinx.serialization.json.Json
  */
 class QwenService(
     private val apiKey: String = QWEN_API_KEY,
+    /**
+     * Reads a previously-cached [TTS_MODEL] voice-design `voice_id` override, if any was ever
+     * persisted (see [resolveVoiceId]). Most installs have none and simply fall back to
+     * [TTS_DEFAULT_VOICE_ID]; this only matters for installs that persisted one back when this
+     * service still created a voice at runtime (now removed, see [resolveVoiceId]).
+     */
+    private val cachedVoiceId: () -> String? = { null },
+    /**
+     * The `voice_id` of the enabled cloned voice to use for a given [Language], or null when none
+     * is enrolled/enabled for it. When present it takes precedence over the default voice-design
+     * voice in [resolveVoiceId], so a learner's own cloned voice is what speaks. Defaults to always
+     * returning null, i.e. no cloned voices, so the service still works standalone (e.g. in tests).
+     */
+    private val enabledClonedVoiceId: (Language) -> String? = { null },
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
     }
+
+    private var inMemoryVoiceId: String? = null
 
     // No explicit engine: each platform source set supplies exactly one Ktor engine on its
     // classpath (OkHttp on the JVM/Android app, the JS fetch/XHR engine on web), which Ktor picks
@@ -43,6 +64,7 @@ class QwenService(
         install(ContentNegotiation) {
             json(json)
         }
+        install(WebSockets)
         install(HttpTimeout) {
             requestTimeoutMillis = 240_000
             connectTimeoutMillis = 30_000
@@ -156,39 +178,198 @@ class QwenService(
     }
 
     /**
-     * Synthesizes [text] to spoken Mandarin using the Qwen3-TTS model and returns the raw audio
-     * bytes (a WAV file) so the caller can play it back. The DashScope endpoint returns a temporary
-     * URL to the generated audio, which this method downloads before returning.
+     * Synthesizes [text] to speech using Alibaba's CosyVoice model and returns the raw audio bytes
+     * (a WAV file) so the caller can play it back.
      *
-     * Throws if the API call fails or returns no audio URL.
+     * CosyVoice is only reachable over a WebSocket ([TTS_ENDPOINT]). The previous Qwen3-TTS
+     * integration called DashScope's HTTP `multimodal-generation` endpoint directly, which has no
+     * CORS support: a browser sends a CORS preflight `OPTIONS` request first, which carries no
+     * `Authorization` header (browsers never send the real header on a preflight), and DashScope's
+     * HTTP endpoint rejects that with a 401 before the real POST is ever attempted. A WebSocket
+     * handshake has no such preflight, so the exact same call now works from both the Android app
+     * and the web build.
+     *
+     * The flow follows CosyVoice's WebSocket protocol: connect, send a `run-task` command
+     * describing the voice/format, wait for `task-started`, stream [text] via a `continue-task`
+     * command, then send `finish-task`; the server streams back one or more binary audio frames
+     * (concatenated here) and finally a `task-finished` event. CosyVoice detects the spoken
+     * language directly from [text] (it supports 31 languages out of the box), so no per-language
+     * allow-list is consulted or maintained here. [language] selects the voice: if the learner has
+     * an enabled cloned voice for it, that voice speaks; otherwise the shared default voice-design
+     * voice is used (see [resolveVoiceId]).
+     *
+     * Throws if the connection/handshake fails or the server reports a `task-failed` event.
      */
     suspend fun synthesizeSpeech(text: String, language: Language): ByteArray {
-        val request = TtsRequest(
-            model = TTS_MODEL,
-            input = TtsInput(
-                text = text,
-                voice = language.ttsVoice,
-                languageType = language.ttsLanguageType,
-            ),
-            parameters = TtsParameters(
-                instructions = TTS_INSTRUCTIONS,
-                optimizeInstructions = true,
+        val voiceId = resolveVoiceId(language)
+        val taskId = randomTaskId()
+        val runTask = RunTaskMessage(
+            header = TaskHeader(action = "run-task", taskId = taskId),
+            payload = RunTaskPayload(
+                model = TTS_MODEL,
+                parameters = TtsParameters(voice = voiceId),
             ),
         )
+        val continueTask = ContinueTaskMessage(
+            header = TaskHeader(action = "continue-task", taskId = taskId),
+            payload = ContinueTaskPayload(input = ContinueTaskInput(text = text)),
+        )
+        val finishTask = FinishTaskMessage(header = TaskHeader(action = "finish-task", taskId = taskId))
 
-        val response: TtsResponse = client.post(TTS_ENDPOINT) {
-            headers {
-                append(HttpHeaders.Authorization, "Bearer $apiKey")
+        val audioChunks = mutableListOf<ByteArray>()
+        var failure: String? = null
+        var finished = false
+
+        try {
+            client.webSocket(TTS_ENDPOINT, request = {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $apiKey")
+                }
+            }) {
+                send(Frame.Text(json.encodeToString(RunTaskMessage.serializer(), runTask)))
+                for (frame in incoming) {
+                    when (frame) {
+                        is Frame.Binary -> audioChunks.add(frame.data)
+                        is Frame.Text -> {
+                            val header = runCatching {
+                                json.decodeFromString(TaskEvent.serializer(), frame.readText())
+                            }.getOrNull()?.header ?: continue
+                            when (header.event) {
+                                "task-started" -> {
+                                    send(Frame.Text(json.encodeToString(ContinueTaskMessage.serializer(), continueTask)))
+                                    send(Frame.Text(json.encodeToString(FinishTaskMessage.serializer(), finishTask)))
+                                }
+                                "task-finished" -> {
+                                    finished = true
+                                    return@webSocket
+                                }
+                                "task-failed" -> {
+                                    failure = "${header.errorCode}: ${header.errorMessage}"
+                                    return@webSocket
+                                }
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+                // The channel ended without a task-finished/task-failed event, e.g. the server can
+                // drop the connection outright on a permission error (such as "Model access denied"
+                // when [TTS_MODEL] isn't enabled for [QWEN_API_KEY]'s Model Studio workspace) instead
+                // of sending a graceful task-failed event. Surface the real close reason rather than
+                // silently falling through to a generic "no audio" error below.
+                if (!finished) {
+                    failure = closeReason.await()?.message ?: "connection closed unexpectedly"
+                }
             }
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
+        } catch (e: Throwable) {
+            // Surface the real reason (e.g. a 401/403 from an invalid API key at the handshake, or a
+            // dropped connection) instead of a bare exception with no context.
+            throw IllegalStateException("CosyVoice TTS request failed: ${e.message}", e)
+        }
 
-        val url = response.output?.audio?.url
-            ?: error("Qwen TTS returned no audio URL")
+        failure?.let { error("CosyVoice TTS request failed: $it") }
+        if (audioChunks.isEmpty()) error("CosyVoice TTS returned no audio")
 
-        return client.get(url).readRawBytes()
+        val audio = ByteArray(audioChunks.sumOf { it.size })
+        var offset = 0
+        for (chunk in audioChunks) {
+            chunk.copyInto(audio, offset)
+            offset += chunk.size
+        }
+        return audio
     }
+
+    /** A random UUID-formatted task id, as CosyVoice's `run-task`/`continue-task`/`finish-task` protocol requires. */
+    private fun randomTaskId(): String {
+        val hex = "0123456789abcdef"
+        fun segment(length: Int) = buildString { repeat(length) { append(hex[Random.nextInt(16)]) } }
+        return "${segment(8)}-${segment(4)}-${segment(4)}-${segment(4)}-${segment(12)}"
+    }
+
+    /**
+     * Returns the `voice_id` to pass as [TtsParameters.voice] in [synthesizeSpeech].
+     *
+     * [TTS_MODEL] (`cosyvoice-v3.5-flash`) ships with no built-in system voices at all — unlike
+     * earlier CosyVoice versions, DashScope rejects every preset voice name for it with an
+     * `InvalidParameter` error. Per Alibaba's docs, a voice must first be generated once via the
+     * Voice Design API (a text description → a synthetic voice, no recording needed) and its
+     * `voice_id` reused for every subsequent synthesis call against the SAME [TTS_MODEL] (a
+     * `voice_id` is bound to the `target_model` it was created with).
+     *
+     * That one-time creation is now done OFFLINE, not at app runtime: [TTS_VOICE_DESIGN_ENDPOINT]
+     * (like every other DashScope HTTP endpoint used by this service, see [TTS_ENDPOINT]) has zero
+     * CORS support, so a browser's preflight `OPTIONS` request to it is rejected with 401 before the
+     * real `POST` is ever attempted — exactly the 401 reported from the web build. Calling it from
+     * [synthesizeSpeech] on every fresh install therefore can never work in a browser, no matter the
+     * API key or permissions. [TTS_DEFAULT_VOICE_ID] is the `voice_id` of a real voice generated once
+     * this way (verified end-to-end against the live endpoint) and simply reused by every install and
+     * platform from then on, so no runtime call to that endpoint is needed at all for the default
+     * voice. [cachedVoiceId] is only consulted for backward compatibility with installs that had
+     * already persisted a voice_id from an earlier version of this method.
+     *
+     * A learner's own cloned voice takes precedence: if [enabledClonedVoiceId] returns an enrolled,
+     * enabled voice for [language], it's used directly and the default voice is skipped entirely.
+     */
+    private fun resolveVoiceId(language: Language): String {
+        enabledClonedVoiceId(language)?.takeIf { it.isNotBlank() }?.let { return it }
+        return inMemoryVoiceId ?: (cachedVoiceId() ?: TTS_DEFAULT_VOICE_ID).also { inMemoryVoiceId = it }
+    }
+
+    /**
+     * Registers a learner-provided audio sample as a cloned CosyVoice voice via DashScope's
+     * `voice-enrollment`/`create_voice` action, binding it to [TTS_MODEL] so [synthesizeSpeech] can
+     * drive it. [audio] is the raw recorded/uploaded sample and is delivered inline as a base64
+     * `data:` URI in the request's `url` field, so no separate upload/hosting step is needed;
+     * [mimeType] describes that sample (WAV for the app's own recordings). [name] is only used to
+     * derive the DashScope enrollment [prefix]; the spoken language is detected from the sample
+     * itself, so it isn't sent here (the caller files the returned voice under the right language).
+     *
+     * Returns the new CosyVoice `voice_id`. Throws [IllegalStateException] carrying DashScope's
+     * actual code/message when enrollment fails, so the UI can reveal the real reason.
+     */
+    suspend fun enrollClonedVoice(
+        name: String,
+        audio: ByteArray,
+        mimeType: String = "audio/wav",
+    ): String {
+        if (audio.isEmpty()) error("No audio was provided to clone")
+        val dataUri = "data:$mimeType;base64,${audio.encodeBase64()}"
+        val request = EnrollVoiceRequest(
+            input = EnrollVoiceInput(
+                targetModel = TTS_MODEL,
+                prefix = enrollmentPrefix(name),
+                url = dataUri,
+            ),
+        )
+        val response: CreateVoiceResponse = try {
+            client.post(TTS_VOICE_DESIGN_ENDPOINT) {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $apiKey")
+                }
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }.body()
+        } catch (e: ResponseException) {
+            val body = runCatching { e.response.bodyAsText() }.getOrNull()
+            throw IllegalStateException(
+                "Voice cloning request failed (${e.response.status}): ${body ?: e.message}",
+                e,
+            )
+        } catch (e: Throwable) {
+            throw IllegalStateException("Voice cloning request failed: ${e.message}", e)
+        }
+
+        return response.output?.voiceId
+            ?: error("Voice cloning returned no voice id (code=${response.code}, message=${response.message})")
+    }
+
+    /**
+     * A DashScope-safe enrollment prefix derived from [name]: lowercase ASCII letters/digits only,
+     * capped at 10 characters and never empty. DashScope uses it to namespace the generated voice
+     * id, so non-Latin names fall back to a fixed literal.
+     */
+    private fun enrollmentPrefix(name: String): String =
+        name.lowercase().filter { it in 'a'..'z' || it in '0'..'9' }.take(10).ifBlank { "voice" }
 
     private fun userPrompt(situation: String, languages: LanguagePair): String =
         "Create a ${languages.target.displayName} study guide that teaches the learner EXACTLY " +
@@ -260,23 +441,84 @@ class QwenService(
     }
 
     companion object {
-        const val QWEN_API_KEY = "sk-6c257c3e09b349bf81c631f31ef6679a"
-
-        private const val ENDPOINT =
-            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
-        private const val MODEL = "qwen-plus"
-
-        private const val TTS_ENDPOINT =
-            "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
-        private const val TTS_MODEL = "qwen3-tts-instruct-flash"
+        const val QWEN_API_KEY = "sk-ws-H.EMXXXLH.PM2V.MEUCIQCImzN24a8LdyNrnJ2cBLTwFnG-V6EU9hTvQEZNXg_PUgIgXxcdGiXJqrxukUizL7Km6EQ52wUdB9SduFDWksiul1Y"
 
         /**
-         * Steers the qwen3-tts-instruct-flash model to read every line with upbeat excitement: an
-         * energetic, cheerful tone with a lively pace and bright, rising intonation.
+         * The DashScope-compatible endpoint host issued with [QWEN_API_KEY]. This is the single
+         * source of truth for every Qwen endpoint (chat completions, TTS, and realtime ASR); the
+         * Android [com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer] and web
+         * `WebSpeechRecognizer` reference [REALTIME_ENDPOINT] below rather than hard-coding the
+         * host themselves.
          */
-        private const val TTS_INSTRUCTIONS =
-            "Speak with upbeat excitement: an energetic, cheerful and enthusiastic tone, a lively " +
-                "pace, and bright, rising intonation, as if eager to share something amazing!"
+        private const val HOST = "ws-hrt7qnf0x5y5avkq.cn-beijing.maas.aliyuncs.com"
+
+        private const val ENDPOINT = "https://$HOST/compatible-mode/v1/chat/completions"
+        private const val MODEL = "qwen-plus"
+
+        /**
+         * CosyVoice's real-time speech synthesis WebSocket endpoint. Unlike the old Qwen3-TTS
+         * `multimodal-generation` HTTP endpoint, this has no CORS preflight to fail, which is what
+         * fixes the 401 seen from the browser build (see [synthesizeSpeech]).
+         */
+        private const val TTS_ENDPOINT = "wss://$HOST/api-ws/v1/inference"
+
+        /**
+         * The CosyVoice model used for cloud speech synthesis over [TTS_ENDPOINT]. As with
+         * [REALTIME_ASR_MODEL], this model must be enabled for [QWEN_API_KEY] in its Model Studio
+         * workspace; if it isn't, the `continue-task` step fails with a `task-failed` event whose
+         * `error_code`/`error_message` (e.g. "Model access denied") is now surfaced by
+         * [synthesizeSpeech] instead of swallowed.
+         *
+         * `cosyvoice-v3.5-flash` (only available in the China (Beijing) region, which matches
+         * [HOST]) ships with NO built-in system voices at all — passing any preset voice name (the
+         * older `-v3`/`-v2`/`-v1` series' approach) is rejected outright with `InvalidParameter`.
+         * A voice must instead be generated once via the Voice Design API and its `voice_id` reused
+         * for every call; see [resolveVoiceId].
+         */
+        private const val TTS_MODEL = "cosyvoice-v3.5-flash"
+
+        /**
+         * DashScope's Voice Design/Cloning HTTP endpoint. Only [enrollClonedVoice] still calls this
+         * at runtime (a learner explicitly cloning their own voice); the shared default voice no
+         * longer does (see [resolveVoiceId]/[TTS_DEFAULT_VOICE_ID]).
+         *
+         * Like every DashScope HTTP endpoint used by this service, it has zero CORS support: a
+         * browser's `OPTIONS` preflight to it is rejected with 401 (verified live) before the real
+         * `POST` is ever attempted, so [enrollClonedVoice] can only ever succeed from a native HTTP
+         * client (the Android app), never from the web build, regardless of API key permissions.
+         */
+        private const val TTS_VOICE_DESIGN_ENDPOINT = "https://$HOST/api/v1/services/audio/tts/customization"
+
+        /**
+         * The `voice_id` of the single default voice every install/platform speaks with unless a
+         * learner has an enabled cloned voice (see [resolveVoiceId]). Generated once, offline,
+         * against [TTS_VOICE_DESIGN_ENDPOINT] from the voice description "A warm, friendly, and
+         * cheerful young adult voice with clear articulation, a natural speaking pace, and an
+         * upbeat, encouraging tone, suitable for a language-learning app.", bound to [TTS_MODEL],
+         * and verified end-to-end (synthesis over [TTS_ENDPOINT] with this id produces valid audio).
+         * Voice descriptions only support Chinese/English text, but per Alibaba's docs the
+         * resulting voice can still synthesize speech in any of CosyVoice's 31 supported languages,
+         * so this one voice covers every [Language].
+         */
+        private const val TTS_DEFAULT_VOICE_ID = "cosyvoice-v3.5-flash-vd-learner-92357aee58e549c2904d945ce64020cc"
+
+        /**
+         * The realtime ASR WebSocket endpoint (OpenAI-style realtime protocol). Shared by the
+         * Android and web speech recognizers so the host lives in exactly one place.
+         */
+        const val REALTIME_ENDPOINT = "wss://$HOST/api-ws/v1/realtime"
+
+        /**
+         * The realtime ASR model used over [REALTIME_ENDPOINT]. This is the single source of truth
+         * for the model name; the Android [com.queatz.microcosmicdisambiguation.audio.QwenSpeechRecognizer]
+         * and web `WebSpeechRecognizer` reference this constant rather than hard-coding it
+         * themselves.
+         *
+         * `fun-asr-realtime` is the realtime ASR model deployed on this endpoint. This model must be
+         * enabled for [QWEN_API_KEY] in the Model Studio workspace, otherwise the session opens but
+         * the server closes it with "Model access denied".
+         */
+        const val REALTIME_ASR_MODEL = "fun-asr-realtime"
 
         private fun systemPrompt(languages: LanguagePair): String {
             val target = languages.target.displayName
@@ -559,37 +801,156 @@ private data class Choice(
     val message: ChatMessage,
 )
 
+// DashScope's Voice Design/Cloning HTTP response schema (`create_voice`). See
+// [QwenService.enrollClonedVoice]; [TTS_DEFAULT_VOICE_ID] was generated offline against this same
+// schema, so no request data class is needed for it at runtime.
+
 @Serializable
-private data class TtsRequest(
-    val model: String,
-    val input: TtsInput,
-    val parameters: TtsParameters? = null,
+private data class CreateVoiceResponse(
+    val output: CreateVoiceOutput? = null,
+    val code: String? = null,
+    val message: String? = null,
 )
 
 @Serializable
-private data class TtsInput(
-    val text: String,
-    val voice: String,
-    @SerialName("language_type") val languageType: String,
+private data class CreateVoiceOutput(
+    // The CosyVoice `voice-enrollment`/`create_voice` action returns the new id under `voice_id`
+    // (verified against the live Beijing-region endpoint); the Qwen `qwen-voice-design`/`create`
+    // variant instead returns `voice`, but this service only ever uses the CosyVoice path.
+    @SerialName("voice_id") val voiceId: String? = null,
+)
+
+// Voice cloning re-uses the same `voice-enrollment`/`create_voice` action as voice design, but
+// supplies a recorded/uploaded audio sample (`url`) instead of a text `voice_prompt`. See
+// [QwenService.enrollClonedVoice]; the response reuses [CreateVoiceResponse].
+
+@Serializable
+private data class EnrollVoiceRequest(
+    val model: String = "voice-enrollment",
+    val input: EnrollVoiceInput,
+)
+
+@Serializable
+private data class EnrollVoiceInput(
+    val action: String = "create_voice",
+    @SerialName("target_model") val targetModel: String,
+    val prefix: String,
+    /** The audio sample to clone, delivered inline as a base64 `data:` URI. */
+    val url: String,
+)
+
+// CosyVoice's WebSocket client/server message schema (run-task/continue-task/finish-task,
+// task-started/task-finished/task-failed). See [QwenService.synthesizeSpeech].
+
+@Serializable
+private data class TaskHeader(
+    val action: String,
+    @SerialName("task_id") val taskId: String,
+    val streaming: String = "duplex",
+)
+
+@Serializable
+private class EmptyPayload
+
+@Serializable
+private data class RunTaskMessage(
+    val header: TaskHeader,
+    val payload: RunTaskPayload,
+)
+
+@Serializable
+private data class RunTaskPayload(
+    @SerialName("task_group") val taskGroup: String = "audio",
+    val task: String = "tts",
+    val function: String = "SpeechSynthesizer",
+    val model: String,
+    val parameters: TtsParameters,
+    val input: EmptyPayload = EmptyPayload(),
 )
 
 @Serializable
 private data class TtsParameters(
-    val instructions: String,
-    @SerialName("optimize_instructions") val optimizeInstructions: Boolean,
+    @SerialName("text_type") val textType: String = "PlainText",
+    val voice: String,
+    val format: String = "wav",
+    @SerialName("sample_rate") val sampleRate: Int = 24_000,
 )
 
 @Serializable
-private data class TtsResponse(
-    val output: TtsOutput? = null,
+private data class ContinueTaskMessage(
+    val header: TaskHeader,
+    val payload: ContinueTaskPayload,
 )
 
 @Serializable
-private data class TtsOutput(
-    val audio: TtsAudio? = null,
+private data class ContinueTaskPayload(
+    val input: ContinueTaskInput,
 )
 
 @Serializable
-private data class TtsAudio(
-    val url: String? = null,
+private data class ContinueTaskInput(
+    val text: String,
 )
+
+@Serializable
+private data class FinishTaskMessage(
+    val header: TaskHeader,
+    val payload: FinishTaskPayload = FinishTaskPayload(),
+)
+
+@Serializable
+private data class FinishTaskPayload(
+    val input: EmptyPayload = EmptyPayload(),
+)
+
+/** A server event (`task-started`/`result-generated`/`task-finished`/`task-failed`); only the header is needed. */
+@Serializable
+private data class TaskEvent(
+    val header: TaskEventHeader? = null,
+)
+
+@Serializable
+private data class TaskEventHeader(
+    val event: String? = null,
+    @SerialName("error_code") val errorCode: String? = null,
+    @SerialName("error_message") val errorMessage: String? = null,
+)
+
+private const val BASE64_ALPHABET =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+/**
+ * A minimal, dependency-free standard Base64 encoder used to inline an audio sample as a `data:`
+ * URI for voice enrollment, so the same code path works on both Android and the web without a
+ * platform-specific encoder.
+ */
+private fun ByteArray.encodeBase64(): String {
+    val sb = StringBuilder((size + 2) / 3 * 4)
+    var i = 0
+    while (i + 3 <= size) {
+        val n = ((this[i].toInt() and 0xFF) shl 16) or
+            ((this[i + 1].toInt() and 0xFF) shl 8) or
+            (this[i + 2].toInt() and 0xFF)
+        sb.append(BASE64_ALPHABET[(n ushr 18) and 0x3F])
+        sb.append(BASE64_ALPHABET[(n ushr 12) and 0x3F])
+        sb.append(BASE64_ALPHABET[(n ushr 6) and 0x3F])
+        sb.append(BASE64_ALPHABET[n and 0x3F])
+        i += 3
+    }
+    when (size - i) {
+        1 -> {
+            val n = (this[i].toInt() and 0xFF) shl 16
+            sb.append(BASE64_ALPHABET[(n ushr 18) and 0x3F])
+            sb.append(BASE64_ALPHABET[(n ushr 12) and 0x3F])
+            sb.append("==")
+        }
+        2 -> {
+            val n = ((this[i].toInt() and 0xFF) shl 16) or ((this[i + 1].toInt() and 0xFF) shl 8)
+            sb.append(BASE64_ALPHABET[(n ushr 18) and 0x3F])
+            sb.append(BASE64_ALPHABET[(n ushr 12) and 0x3F])
+            sb.append(BASE64_ALPHABET[(n ushr 6) and 0x3F])
+            sb.append("=")
+        }
+    }
+    return sb.toString()
+}

@@ -31,6 +31,7 @@ import com.queatz.microcosmicdisambiguation.ui.MissionScreen
 import com.queatz.microcosmicdisambiguation.ui.RecordingsScreen
 import com.queatz.microcosmicdisambiguation.ui.SettingsScreen
 import com.queatz.microcosmicdisambiguation.ui.StudyScreen
+import com.queatz.microcosmicdisambiguation.ui.text.WithScriptFallback
 import org.jetbrains.compose.resources.stringResource
 
 /** The in-app navigation destinations, driving a tiny explicit back stack that works on every platform. */
@@ -52,6 +53,13 @@ fun MicrocosmicDisambiguationApp() {
     val container = LocalAppContainer.current
     val viewModel: MainViewModel = viewModel { MainViewModel(container) }
     val state by viewModel.uiState.collectAsState()
+    val missionState by viewModel.missionState.collectAsState()
+
+    // Every script the app needs to render, present or future, is discovered here rather than
+    // hand-wired per language: this covers every session's generated study guide and missions
+    // (current and historical, since `state.history` embeds them), so any new script encountered
+    // in AI-generated content gets its fallback font preloaded automatically. See `WithScriptFallback`.
+    val visibleText = remember(state, missionState) { state.toString() + missionState.toString() }
 
     // A minimal, platform-agnostic navigation stack (replaces Android-only Navigation-Compose).
     val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
@@ -149,88 +157,110 @@ fun MicrocosmicDisambiguationApp() {
         viewModel.onSessionGenerated()
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        val contentModifier = Modifier.padding(innerPadding)
-        when (val screen = current) {
-            Screen.Home -> {
-                // On the home screen, the speaker reads the currently selected target language.
-                LaunchedEffect(state.languagePair.target) {
-                    speakerLanguage = state.languagePair.target
-                }
-                HomeScreen(
-                    state = state,
-                    recognizer = speechRecognizer,
-                    onStudy = { situation -> viewModel.generate(situation) },
-                    onOpenSession = { id -> navigate(Screen.Study(id)) },
-                    onDeleteSession = { id -> viewModel.deleteSession(id) },
-                    onOpenSettings = { navigate(Screen.Settings) },
-                    onDismissError = { viewModel.clearError() },
-                    onTargetLanguageChange = { viewModel.setTargetLanguage(it) },
-                    modifier = contentModifier,
-                )
-            }
-
-            Screen.Settings -> {
-                SettingsScreen(
-                    ttsMode = state.ttsMode,
-                    sourceLanguage = state.languagePair.source,
-                    targetLanguage = state.languagePair.target,
-                    onSelectMode = { viewModel.setTtsMode(it) },
-                    onSelectSourceLanguage = { viewModel.setSourceLanguage(it) },
-                    onBack = { popBack() },
-                    onOpenRecordings = { navigate(Screen.Recordings) },
-                    modifier = contentModifier,
-                )
-            }
-
-            Screen.Recordings -> {
-                val recordings by viewModel.recordings.collectAsState()
-                RecordingsScreen(
-                    recordings = recordings,
-                    onBack = { popBack() },
-                    onDelete = { id -> viewModel.deleteRecording(id) },
-                    modifier = contentModifier,
-                )
-            }
-
-            is Screen.Study -> {
-                val id = screen.id
-                // Speak this session in its own target language, not the current selection.
-                LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
-                val guide = remember(id) { viewModel.guide(id) }
-                if (guide == null) {
-                    LaunchedEffect(id) { popBack() }
-                } else {
-                    val sessionLanguage = remember(id) { viewModel.languagePairOf(id).target }
-                    StudyScreen(
-                        guide = guide,
-                        speaker = speaker,
-                        language = sessionLanguage,
-                        onClose = { popBack() },
-                        onStartMissions = { navigate(Screen.Mission(id)) },
+    WithScriptFallback(text = visibleText) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            val contentModifier = Modifier.padding(innerPadding)
+            when (val screen = current) {
+                Screen.Home -> {
+                    // On the home screen, the speaker reads the currently selected target language.
+                    LaunchedEffect(state.languagePair.target) {
+                        speakerLanguage = state.languagePair.target
+                    }
+                    HomeScreen(
+                        state = state,
+                        recognizer = speechRecognizer,
+                        onStudy = { situation -> viewModel.generate(situation) },
+                        onOpenSession = { id -> navigate(Screen.Study(id)) },
+                        onDeleteSession = { id -> viewModel.deleteSession(id) },
+                        onOpenSettings = { navigate(Screen.Settings) },
+                        onDismissError = { viewModel.clearError() },
+                        onTargetLanguageChange = { viewModel.setTargetLanguage(it) },
+                        onDismissWelcomeBanner = { viewModel.dismissWelcomeBanner() },
                         modifier = contentModifier,
                     )
                 }
-            }
 
-            is Screen.Mission -> {
-                val id = screen.id
-                val missionState by viewModel.missionState.collectAsState()
-                LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
-                LaunchedEffect(id) { viewModel.loadMissions(id) }
-                MissionScreen(
-                    title = remember(id) { viewModel.title(id) },
-                    state = missionState,
-                    speaker = speaker,
-                    qwenService = viewModel.qwenService,
-                    languages = viewModel.languagePairOf(id),
-                    onClose = { popBack() },
-                    onRetry = {
-                        viewModel.resetMissions()
-                        viewModel.loadMissions(id)
-                    },
-                    modifier = contentModifier,
-                )
+                Screen.Settings -> {
+                    val clonedVoices by viewModel.clonedVoices.collectAsState()
+                    SettingsScreen(
+                        ttsMode = state.ttsMode,
+                        sourceLanguage = state.languagePair.source,
+                        targetLanguage = state.languagePair.target,
+                        clonedVoices = clonedVoices,
+                        onSelectMode = { viewModel.setTtsMode(it) },
+                        onSelectSourceLanguage = { viewModel.setSourceLanguage(it) },
+                        onBack = { popBack() },
+                        onOpenRecordings = { navigate(Screen.Recordings) },
+                        onToggleClonedVoice = { id, enabled -> viewModel.setClonedVoiceEnabled(id, enabled) },
+                        onDeleteClonedVoice = { id -> viewModel.deleteClonedVoice(id) },
+                        onEnrollVoice = { name, language, audio, mimeType ->
+                            viewModel.enrollVoice(name, language, audio, mimeType)
+                        },
+                        createRecognizer = { language ->
+                            container.audio.createSpeechRecognizer(listOf(language.asrCode))
+                        },
+                        modifier = contentModifier,
+                    )
+                }
+
+                Screen.Recordings -> {
+                    val recordings by viewModel.recordings.collectAsState()
+                    RecordingsScreen(
+                        recordings = recordings,
+                        onBack = { popBack() },
+                        onDelete = { id -> viewModel.deleteRecording(id) },
+                        modifier = contentModifier,
+                    )
+                }
+
+                is Screen.Study -> {
+                    val id = screen.id
+                    // Speak this session in its own target language, not the current selection.
+                    LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
+                    val guide = remember(id) { viewModel.guide(id) }
+                    if (guide == null) {
+                        LaunchedEffect(id) { popBack() }
+                    } else {
+                        val sessionLanguage = remember(id) { viewModel.languagePairOf(id).target }
+                        // Read the played rounds from the live history so completing a play round
+                        // unlocks skipping immediately (and persists across visits).
+                        val playedStructures = state.history
+                            .firstOrNull { it.id == id }
+                            ?.playedStructures
+                            .orEmpty()
+                        StudyScreen(
+                            guide = guide,
+                            speaker = speaker,
+                            language = sessionLanguage,
+                            playedStructures = playedStructures,
+                            onStructurePlayed = { index ->
+                                viewModel.markStructurePlayed(id, index)
+                            },
+                            onClose = { popBack() },
+                            onStartMissions = { navigate(Screen.Mission(id)) },
+                            modifier = contentModifier,
+                        )
+                    }
+                }
+
+                is Screen.Mission -> {
+                    val id = screen.id
+                    LaunchedEffect(id) { speakerLanguage = viewModel.languagePairOf(id).target }
+                    LaunchedEffect(id) { viewModel.loadMissions(id) }
+                    MissionScreen(
+                        title = remember(id) { viewModel.title(id) },
+                        state = missionState,
+                        speaker = speaker,
+                        qwenService = viewModel.qwenService,
+                        languages = viewModel.languagePairOf(id),
+                        onClose = { popBack() },
+                        onRetry = {
+                            viewModel.resetMissions()
+                            viewModel.loadMissions(id)
+                        },
+                        modifier = contentModifier,
+                    )
+                }
             }
         }
     }

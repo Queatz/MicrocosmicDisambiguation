@@ -11,9 +11,10 @@ package com.queatz.microcosmicdisambiguation.data
  * @param displayName the human-readable name shown in the UI
  * @param flag a flag emoji used as a compact visual label
  * @param localeTag the BCP-47 tag used to configure the on-device [android.speech.tts.TextToSpeech]
- *   engine
- * @param ttsLanguageType the `language_type` value the Qwen cloud TTS expects
- * @param ttsVoice the Qwen cloud TTS voice to read this language with
+ *   engine. There is no per-language cloud TTS voice to configure here: CosyVoice detects the
+ *   spoken language directly from the text itself (it supports 31 languages), and the single cloud
+ *   voice used for every language is resolved once by
+ *   [com.queatz.microcosmicdisambiguation.ai.QwenService] rather than stored per [Language].
  * @param asrCode the `language` hint passed to the Qwen real-time speech recognizer when the
  *   learner dictates a situation in this language
  * @param scriptDescription a short description of the writing system, injected into the AI prompt so
@@ -27,8 +28,6 @@ enum class Language(
     val displayName: String,
     val flag: String,
     val localeTag: String,
-    val ttsLanguageType: String,
-    val ttsVoice: String,
     val asrCode: String,
     val scriptDescription: String,
     val usesRomanization: Boolean,
@@ -38,8 +37,6 @@ enum class Language(
         displayName = "English",
         flag = "\uD83C\uDDEC\uD83C\uDDE7",
         localeTag = "en-US",
-        ttsLanguageType = "English",
-        ttsVoice = "Maia",
         asrCode = "en",
         scriptDescription = "the Latin alphabet",
         usesRomanization = false,
@@ -49,8 +46,6 @@ enum class Language(
         displayName = "Chinese",
         flag = "\uD83C\uDDE8\uD83C\uDDF3",
         localeTag = "zh-CN",
-        ttsLanguageType = "Chinese",
-        ttsVoice = "Maia",
         asrCode = "zh",
         scriptDescription = "simplified Chinese characters",
         usesRomanization = true,
@@ -60,8 +55,6 @@ enum class Language(
         displayName = "Vietnamese",
         flag = "\uD83C\uDDFB\uD83C\uDDF3",
         localeTag = "vi-VN",
-        ttsLanguageType = "Vietnamese",
-        ttsVoice = "Maia",
         asrCode = "vi",
         scriptDescription = "the Vietnamese Latin alphabet with full diacritics",
         usesRomanization = false,
@@ -71,8 +64,6 @@ enum class Language(
         displayName = "Korean",
         flag = "\uD83C\uDDF0\uD83C\uDDF7",
         localeTag = "ko-KR",
-        ttsLanguageType = "Korean",
-        ttsVoice = "Maia",
         asrCode = "ko",
         scriptDescription = "the Korean Hangul script",
         usesRomanization = true,
@@ -82,8 +73,6 @@ enum class Language(
         displayName = "Japanese",
         flag = "\uD83C\uDDEF\uD83C\uDDF5",
         localeTag = "ja-JP",
-        ttsLanguageType = "Japanese",
-        ttsVoice = "Maia",
         asrCode = "ja",
         scriptDescription = "natural Japanese script (kanji and kana)",
         usesRomanization = true,
@@ -93,8 +82,6 @@ enum class Language(
         displayName = "Burmese",
         flag = "\uD83C\uDDF2\uD83C\uDDF2",
         localeTag = "my-MM",
-        ttsLanguageType = "Burmese",
-        ttsVoice = "Maia",
         asrCode = "my",
         scriptDescription = "the Burmese (Myanmar) script",
         usesRomanization = true,
@@ -104,8 +91,6 @@ enum class Language(
         displayName = "Russian",
         flag = "\uD83C\uDDF7\uD83C\uDDFA",
         localeTag = "ru-RU",
-        ttsLanguageType = "Russian",
-        ttsVoice = "Maia",
         asrCode = "ru",
         scriptDescription = "the Russian Cyrillic alphabet",
         usesRomanization = true,

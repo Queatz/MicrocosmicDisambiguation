@@ -8,6 +8,8 @@ import io.objectbox.kotlin.boxFor
 import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -57,6 +59,15 @@ class ObjectBoxStudyStore(context: Context) : StudyStore {
         }
     }
 
+    override suspend fun savePlayedStructures(id: Long, playedStructures: Set<Int>) {
+        withContext(Dispatchers.IO) {
+            val entity = box.get(id) ?: return@withContext
+            entity.playedJson =
+                json.encodeToString(ListSerializer(Int.serializer()), playedStructures.sorted())
+            box.put(entity)
+        }
+    }
+
     override suspend fun delete(id: Long) {
         withContext(Dispatchers.IO) { box.remove(id) }
     }
@@ -74,6 +85,10 @@ class ObjectBoxStudyStore(context: Context) : StudyStore {
             target = Language.fromName(targetLang, LanguagePair.Default.target),
         ),
         createdAt = createdAt,
+        playedStructures = playedJson?.takeIf { it.isNotBlank() }
+            ?.let { json.decodeFromString(ListSerializer(Int.serializer()), it) }
+            ?.toSet()
+            .orEmpty(),
     )
 
     companion object {

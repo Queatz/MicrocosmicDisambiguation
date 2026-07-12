@@ -14,6 +14,9 @@
     <string name="try_again">Try again</string>
 
     <!-- Home screen -->
+    <string name="home_welcome_banner_title">🌍 Remember and learn to chat in any language quickly.</string>
+    <string name="home_welcome_banner_message">Perfect your listening and speaking skills using tiny microcosms too easily keep up with the natives.</string>
+    <string name="home_welcome_banner_dismiss">Dismiss</string>
     <string name="home_whats_going_on">What's going on?</string>
     <string name="home_describe_situation">Describe a real-life situation to study it.</string>
     <string name="home_irl_situation_placeholder">IRL situation</string>
@@ -38,6 +41,31 @@
     <string name="settings_tts_system_description">Uses your device's built-in text-to-speech engine. Works offline.</string>
     <string name="settings_review_recordings">Review recordings</string>
     <string name="settings_review_recordings_description">Listen to your saved voice recordings and their transcriptions.</string>
+    <string name="settings_cloned_voices">Cloned voices</string>
+    <string name="settings_clone_a_voice">Clone a voice</string>
+    <string name="settings_clone_a_voice_description">Train a custom AI voice for a language from your own audio.</string>
+    <string name="settings_no_cloned_voices">No cloned voices yet. Tap "Clone a voice" to train one for a language.</string>
+    <string name="cloned_voice_enabled">Enabled</string>
+    <string name="cloned_voice_delete">Delete voice</string>
+    <string name="cloned_voice_delete_title">Delete cloned voice?</string>
+    <string name="cloned_voice_delete_message">This will remove \"%1$s\" permanently.</string>
+
+    <!-- Clone a voice dialog -->
+    <string name="clone_voice_title">Clone a voice</string>
+    <string name="clone_voice_language">Language</string>
+    <string name="clone_voice_name">Voice name</string>
+    <string name="clone_voice_name_placeholder">e.g. My voice</string>
+    <string name="clone_voice_hint">Record or upload 10–20 seconds of clear speech in the selected language.</string>
+    <string name="clone_voice_record">Record a sample</string>
+    <string name="clone_voice_stop">Stop recording</string>
+    <string name="clone_voice_recording">Recording… speak now.</string>
+    <string name="clone_voice_upload">Upload audio</string>
+    <string name="clone_voice_sample_ready">Sample ready.</string>
+    <string name="clone_voice_create">Clone voice</string>
+    <string name="clone_voice_enrolling">Enrolling voice…</string>
+    <string name="clone_voice_success">Voice cloned successfully.</string>
+    <string name="clone_voice_error">Couldn\'t clone voice: %1$s</string>
+    <string name="clone_voice_permission_needed">Microphone permission is needed to record a sample.</string>
 
     <!-- Recordings screen -->
     <string name="recordings_empty">No recordings yet. Dictate an IRL situation to capture one.</string>
@@ -70,6 +98,25 @@
     <string name="study_pronounce_retry">Retry</string>
     <string name="study_pronounce_no_speech">Didn't catch that. Try recording again a little louder.</string>
     <string name="study_pronounce_permission_needed">Microphone permission is needed to practice pronunciation.</string>
+
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">Play · Round %1$d of %2$d</string>
+    <string name="play_intro_hint">Tap a coin to peek at its meaning.</string>
+    <string name="play_game_hint">Tap a coin and say its word out loud!</string>
+    <string name="play_meanings_hint">Now say the word for each meaning to flip the coins back!</string>
+    <string name="play_lets_play">Let's play</string>
+    <string name="play_skip">Skip</string>
+    <string name="play_continue">Continue</string>
+    <string name="play_progress">%1$d of %2$d words</string>
+    <string name="play_say_word">Say it out loud!</string>
+    <string name="play_say_word_meaning">What's this word? Say it!</string>
+    <string name="play_listen">Listen…</string>
+    <string name="play_listening">Listening…</string>
+    <string name="play_checking">Checking…</string>
+    <string name="play_try_again">Not quite — tap the coin to try again.</string>
+    <string name="play_all_done">You said them all! 🎉</string>
+    <string name="play_no_speech">Didn't catch that. Try again a little louder.</string>
+    <string name="play_permission_needed">Microphone permission is needed to play.</string>
 
     <!-- Mission screen -->
     <string name="mission_building">Building your missions…</string>

@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
@@ -79,6 +80,9 @@ import com.queatz.microcosmicdisambiguation.resources.home_previous_sessions
 import com.queatz.microcosmicdisambiguation.resources.home_stop_voice_input
 import com.queatz.microcosmicdisambiguation.resources.home_study_this
 import com.queatz.microcosmicdisambiguation.resources.home_voice_input
+import com.queatz.microcosmicdisambiguation.resources.home_welcome_banner_dismiss
+import com.queatz.microcosmicdisambiguation.resources.home_welcome_banner_message
+import com.queatz.microcosmicdisambiguation.resources.home_welcome_banner_title
 import com.queatz.microcosmicdisambiguation.resources.home_whats_going_on
 import com.queatz.microcosmicdisambiguation.resources.settings
 import org.jetbrains.compose.resources.stringResource
@@ -93,6 +97,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onDismissError: () -> Unit,
     onTargetLanguageChange: (Language) -> Unit,
+    onDismissWelcomeBanner: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var situation by remember { mutableStateOf(TextFieldValue("")) }
@@ -102,61 +107,29 @@ fun HomeScreen(
         focusRequester.requestFocus()
     }
 
-    // A wide window (landscape phone or tablet) shows the input and the previous sessions side by
-    // side; a narrow window stacks them. Measuring the available width keeps this identical on every
-    // platform, without any Android-only configuration APIs.
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val useTwoColumnLayout = state.history.isNotEmpty() && maxWidth >= 600.dp
+    Column(modifier = modifier.fillMaxSize()) {
+        // Shown once, the very first time the app is opened; dismissing it persists forever.
+        AnimatedVisibility(visible = state.showWelcomeBanner) {
+            WelcomeBanner(
+                onDismiss = onDismissWelcomeBanner,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+        }
 
-        if (useTwoColumnLayout) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                MainSection(
-                    state = state,
-                    recognizer = recognizer,
-                    situation = situation,
-                    onSituationChange = { situation = it },
-                    onStudy = onStudy,
-                    onDismissError = onDismissError,
-                    onTargetLanguageChange = onTargetLanguageChange,
-                    focusRequester = focusRequester,
+        // A wide window (landscape phone or tablet) shows the input and the previous sessions side by
+        // side; a narrow window stacks them. Measuring the available width keeps this identical on every
+        // platform, without any Android-only configuration APIs.
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val useTwoColumnLayout = state.history.isNotEmpty() && maxWidth >= 600.dp
+
+            if (useTwoColumnLayout) {
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                )
-                PreviousSessionsSection(
-                    state = state,
-                    onOpenSession = onOpenSession,
-                    onDeleteSession = onDeleteSession,
-                    onOpenSettings = onOpenSettings,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TargetLanguageButton(
-                        languagePair = state.languagePair,
-                        onTargetLanguageChange = onTargetLanguageChange,
-                    )
-                }
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     MainSection(
                         state = state,
@@ -167,16 +140,104 @@ fun HomeScreen(
                         onDismissError = onDismissError,
                         onTargetLanguageChange = onTargetLanguageChange,
                         focusRequester = focusRequester,
-                        showLanguageButton = false,
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
                     )
                     PreviousSessionsSection(
                         state = state,
                         onOpenSession = onOpenSession,
                         onDeleteSession = onDeleteSession,
                         onOpenSettings = onOpenSettings,
-                        scrollable = true,
+                        modifier = Modifier.weight(1f),
                     )
                 }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TargetLanguageButton(
+                            languagePair = state.languagePair,
+                            onTargetLanguageChange = onTargetLanguageChange,
+                        )
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        MainSection(
+                            state = state,
+                            recognizer = recognizer,
+                            situation = situation,
+                            onSituationChange = { situation = it },
+                            onStudy = onStudy,
+                            onDismissError = onDismissError,
+                            onTargetLanguageChange = onTargetLanguageChange,
+                            focusRequester = focusRequester,
+                            showLanguageButton = false,
+                        )
+                        PreviousSessionsSection(
+                            state = state,
+                            onOpenSession = onOpenSession,
+                            onDeleteSession = onDeleteSession,
+                            onOpenSettings = onOpenSettings,
+                            scrollable = true,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A dismissible, first-time-only banner introducing the app, shown above the rest of the home
+ * screen until the learner taps its close ("X") button, which persists the dismissal so it never
+ * reappears.
+ */
+@Composable
+private fun WelcomeBanner(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 20.dp, top = 16.dp, end = 8.dp, bottom = 16.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.home_welcome_banner_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = stringResource(Res.string.home_welcome_banner_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(Res.string.home_welcome_banner_dismiss),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
             }
         }
     }

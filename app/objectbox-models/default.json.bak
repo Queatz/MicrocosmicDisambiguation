@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:949373012597390392",
-      "lastPropertyId": "7:1714696709452914583",
+      "lastPropertyId": "9:8668221353727915269",
       "name": "SituationEntity",
       "properties": [
         {
@@ -42,6 +42,16 @@
         {
           "id": "7:1714696709452914583",
           "name": "missionJson",
+          "type": 9
+        },
+        {
+          "id": "8:7633040550183233280",
+          "name": "sourceLang",
+          "type": 9
+        },
+        {
+          "id": "9:8668221353727915269",
+          "name": "targetLang",
           "type": 9
         }
       ],

@@ -72,6 +72,25 @@
     <string name="study_pronounce_no_speech">Không nghe rõ. Hãy ghi âm lại to hơn một chút.</string>
     <string name="study_pronounce_permission_needed">Cần quyền micrô để luyện phát âm.</string>
 
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">Chơi · Vòng %1$d / %2$d</string>
+    <string name="play_intro_hint">Chạm vào một đồng xu để xem nghĩa của nó.</string>
+    <string name="play_game_hint">Chạm vào một đồng xu và nói to từ đó!</string>
+    <string name="play_meanings_hint">Giờ hãy nói từ tương ứng với mỗi nghĩa để lật ngược các đồng xu lại!</string>
+    <string name="play_lets_play">Chơi thôi</string>
+    <string name="play_skip">Bỏ qua</string>
+    <string name="play_continue">Tiếp tục</string>
+    <string name="play_progress">%1$d / %2$d từ</string>
+    <string name="play_say_word">Hãy nói to lên!</string>
+    <string name="play_say_word_meaning">Từ này là gì? Hãy nói ra!</string>
+    <string name="play_listen">Hãy nghe…</string>
+    <string name="play_listening">Đang nghe…</string>
+    <string name="play_checking">Đang kiểm tra…</string>
+    <string name="play_try_again">Chưa đúng — chạm vào đồng xu để thử lại.</string>
+    <string name="play_all_done">Bạn đã nói hết tất cả! 🎉</string>
+    <string name="play_no_speech">Không nghe rõ. Hãy thử lại to hơn một chút.</string>
+    <string name="play_permission_needed">Cần quyền micrô để chơi.</string>
+
     <!-- Mission screen -->
     <string name="mission_building">Đang tạo nhiệm vụ cho bạn…</string>
     <string name="mission_building_subtitle">Các tình huống thực tế bạn có thể vượt qua bằng những gì đã học.</string>

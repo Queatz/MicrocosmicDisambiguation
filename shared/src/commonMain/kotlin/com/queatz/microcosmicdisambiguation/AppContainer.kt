@@ -18,7 +18,10 @@ class AppContainer(
     val recordingStore: RecordingStore,
     val settingsStore: SettingsStore,
     val audio: AudioFactory,
-    val qwenService: QwenService = QwenService(),
+    val qwenService: QwenService = QwenService(
+        cachedVoiceId = { settingsStore.cosyVoiceId },
+        enabledClonedVoiceId = { settingsStore.enabledClonedVoiceId(it) },
+    ),
 )
 
 /** Provides the current [AppContainer] to the shared UI. Must be supplied by the platform host. */

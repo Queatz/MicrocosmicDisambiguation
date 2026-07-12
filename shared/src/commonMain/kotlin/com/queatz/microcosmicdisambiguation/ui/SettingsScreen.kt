@@ -15,8 +15,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -25,7 +29,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,13 +42,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.queatz.microcosmicdisambiguation.audio.SpeechRecognizer
+import com.queatz.microcosmicdisambiguation.data.ClonedVoice
 import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.TtsMode
 import com.queatz.microcosmicdisambiguation.resources.Res
 import com.queatz.microcosmicdisambiguation.resources.back
+import com.queatz.microcosmicdisambiguation.resources.cancel
+import com.queatz.microcosmicdisambiguation.resources.cloned_voice_delete
+import com.queatz.microcosmicdisambiguation.resources.cloned_voice_delete_message
+import com.queatz.microcosmicdisambiguation.resources.cloned_voice_delete_title
+import com.queatz.microcosmicdisambiguation.resources.delete
 import com.queatz.microcosmicdisambiguation.resources.recordings
 import com.queatz.microcosmicdisambiguation.resources.settings
+import com.queatz.microcosmicdisambiguation.resources.settings_clone_a_voice
+import com.queatz.microcosmicdisambiguation.resources.settings_clone_a_voice_description
+import com.queatz.microcosmicdisambiguation.resources.settings_cloned_voices
 import com.queatz.microcosmicdisambiguation.resources.settings_i_speak
+import com.queatz.microcosmicdisambiguation.resources.settings_no_cloned_voices
 import com.queatz.microcosmicdisambiguation.resources.settings_review_recordings
 import com.queatz.microcosmicdisambiguation.resources.settings_review_recordings_description
 import com.queatz.microcosmicdisambiguation.resources.settings_tts_ai_description
@@ -62,12 +79,20 @@ fun SettingsScreen(
     ttsMode: TtsMode,
     sourceLanguage: Language,
     targetLanguage: Language,
+    clonedVoices: List<ClonedVoice>,
     onSelectMode: (TtsMode) -> Unit,
     onSelectSourceLanguage: (Language) -> Unit,
     onBack: () -> Unit,
     onOpenRecordings: () -> Unit,
+    onToggleClonedVoice: (id: String, enabled: Boolean) -> Unit,
+    onDeleteClonedVoice: (id: String) -> Unit,
+    onEnrollVoice: suspend (name: String, language: Language, audio: ByteArray, mimeType: String) -> Result<ClonedVoice>,
+    createRecognizer: (Language) -> SpeechRecognizer,
     modifier: Modifier = Modifier,
 ) {
+    var showCloneDialog by remember { mutableStateOf(false) }
+    var voiceToDelete by remember { mutableStateOf<ClonedVoice?>(null) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -132,6 +157,166 @@ fun SettingsScreen(
         )
 
         RecordingsEntry(onClick = onOpenRecordings)
+
+        Text(
+            text = stringResource(Res.string.settings_cloned_voices),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CloneVoiceEntry(onClick = { showCloneDialog = true })
+
+            if (clonedVoices.isEmpty()) {
+                Text(
+                    text = stringResource(Res.string.settings_no_cloned_voices),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                clonedVoices.forEach { voice ->
+                    ClonedVoiceRow(
+                        voice = voice,
+                        onToggle = { enabled -> onToggleClonedVoice(voice.id, enabled) },
+                        onDelete = { voiceToDelete = voice },
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCloneDialog) {
+        CloneVoiceDialog(
+            defaultLanguage = targetLanguage,
+            createRecognizer = createRecognizer,
+            onEnroll = onEnrollVoice,
+            onDismiss = { showCloneDialog = false },
+        )
+    }
+
+    voiceToDelete?.let { voice ->
+        AlertDialog(
+            onDismissRequest = { voiceToDelete = null },
+            title = { Text(stringResource(Res.string.cloned_voice_delete_title)) },
+            text = { Text(stringResource(Res.string.cloned_voice_delete_message, voice.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteClonedVoice(voice.id)
+                        voiceToDelete = null
+                    },
+                ) {
+                    Text(stringResource(Res.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { voiceToDelete = null }) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+/** The "Clone a voice" entry that opens the [CloneVoiceDialog]. */
+@Composable
+private fun CloneVoiceEntry(onClick: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.RecordVoiceOver,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_clone_a_voice),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_clone_a_voice_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** A single enrolled voice: its language flag + name, an enable switch, and a delete button. */
+@Composable
+private fun ClonedVoiceRow(
+    voice: ClonedVoice,
+    onToggle: (Boolean) -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = voice.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "${voice.language.flag} ${voice.language.displayName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = voice.enabled, onCheckedChange = onToggle)
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(Res.string.cloned_voice_delete),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }
 

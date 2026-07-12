@@ -72,6 +72,25 @@
     <string name="study_pronounce_no_speech">မကြားလိုက်ပါ။ အသံကို နည်းနည်းကျယ်ကျယ် ထပ်ဖမ်းကြည့်ပါ။</string>
     <string name="study_pronounce_permission_needed">အသံထွက် လေ့ကျင့်ရန် မိုက်ခရိုဖုန်း ခွင့်ပြုချက် လိုအပ်သည်။</string>
 
+    <!-- Play screen (pre-study word coin game) -->
+    <string name="play_round">ကစားမည် · အဆင့် %1$d / %2$d</string>
+    <string name="play_intro_hint">အဓိပ္ပာယ်ကို ကြည့်ရန် ဒင်္ဂါးတစ်ခုကို တို့ပါ။</string>
+    <string name="play_game_hint">ဒင်္ဂါးတစ်ခုကို တို့ပြီး ၎င်း၏စကားလုံးကို အသံထွက်ပြောပါ!</string>
+    <string name="play_meanings_hint">အခု အဓိပ္ပာယ်တစ်ခုစီအတွက် စကားလုံးကို ပြောပြီး ဒင်္ဂါးများကို ပြန်လှန်ပါ!</string>
+    <string name="play_lets_play">ကစားကြမယ်</string>
+    <string name="play_skip">ကျော်မည်</string>
+    <string name="play_continue">ဆက်လုပ်မည်</string>
+    <string name="play_progress">စကားလုံး %1$d / %2$d</string>
+    <string name="play_say_word">အသံထွက်ပြောကြည့်ပါ!</string>
+    <string name="play_say_word_meaning">ဒီစကားလုံးက ဘာလဲ? ပြောကြည့်ပါ!</string>
+    <string name="play_listen">နားထောင်ပါ…</string>
+    <string name="play_listening">နားထောင်နေသည်…</string>
+    <string name="play_checking">စစ်ဆေးနေသည်…</string>
+    <string name="play_try_again">မမှန်သေးပါ — ဒင်္ဂါးကို တို့ပြီး ထပ်စမ်းကြည့်ပါ။</string>
+    <string name="play_all_done">အားလုံးပြောနိုင်ခဲ့ပြီ! 🎉</string>
+    <string name="play_no_speech">ကောင်းစွာမကြားရပါ။ အသံနည်းနည်းကျယ်ကျယ်ဖြင့် ထပ်စမ်းပါ။</string>
+    <string name="play_permission_needed">ကစားရန် မိုက်ခရိုဖုန်းခွင့်ပြုချက် လိုအပ်သည်။</string>
+
     <!-- Mission screen -->
     <string name="mission_building">သင့်တာဝန်များကို ဖန်တီးနေသည်…</string>
     <string name="mission_building_subtitle">သင်လေ့လာထားသည်များဖြင့် ဖြတ်သန်းနိုင်သော တကယ့်အခြေအနေများ။</string>

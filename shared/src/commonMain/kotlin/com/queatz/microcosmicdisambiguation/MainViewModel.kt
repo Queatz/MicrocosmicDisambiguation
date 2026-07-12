@@ -2,6 +2,7 @@ package com.queatz.microcosmicdisambiguation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.queatz.microcosmicdisambiguation.data.ClonedVoice
 import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.MissionSet
@@ -28,6 +29,7 @@ data class HomeUiState(
     val generatedSessionId: Long? = null,
     val ttsMode: TtsMode = TtsMode.System,
     val languagePair: LanguagePair = LanguagePair.Default,
+    val showWelcomeBanner: Boolean = false,
 )
 
 /**
@@ -64,7 +66,11 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     private var sessions: List<StudySession> = emptyList()
 
     private val _uiState = MutableStateFlow(
-        HomeUiState(ttsMode = settings.ttsMode, languagePair = settings.languagePair),
+        HomeUiState(
+            ttsMode = settings.ttsMode,
+            languagePair = settings.languagePair,
+            showWelcomeBanner = !settings.hasDismissedWelcomeBanner,
+        ),
     )
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
@@ -73,6 +79,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _recordings = MutableStateFlow<List<Recording>>(emptyList())
     val recordings: StateFlow<List<Recording>> = _recordings.asStateFlow()
+
+    private val _clonedVoices = MutableStateFlow(settings.clonedVoices)
+    val clonedVoices: StateFlow<List<ClonedVoice>> = _clonedVoices.asStateFlow()
 
     init {
         refreshHistory()
@@ -101,6 +110,12 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     fun swapLanguages() {
         settings.languagePair = settings.languagePair.swapped()
         _uiState.update { it.copy(languagePair = settings.languagePair) }
+    }
+
+    /** Dismisses the first-time welcome banner and remembers not to show it again. */
+    fun dismissWelcomeBanner() {
+        settings.hasDismissedWelcomeBanner = true
+        _uiState.update { it.copy(showWelcomeBanner = false) }
     }
 
     /** The [LanguagePair] a stored session was generated for (its own languages, not the current selection). */
@@ -132,6 +147,51 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             recordingStore.delete(id)
             _recordings.value = recordingStore.all()
         }
+    }
+
+    /**
+     * Registers a recorded/uploaded [audio] sample as a cloned CosyVoice voice named [name] for
+     * [language], persisting it (enabled) and republishing [clonedVoices] on success. Runs the
+     * (network) enrollment on the caller's coroutine so the clone dialog can await the outcome and
+     * reveal either success or the real error. [mimeType] describes [audio] (WAV for recordings).
+     */
+    suspend fun enrollVoice(
+        name: String,
+        language: Language,
+        audio: ByteArray,
+        mimeType: String = "audio/wav",
+    ): Result<ClonedVoice> = runCatching {
+        val voiceId = qwenService.enrollClonedVoice(name = name, audio = audio, mimeType = mimeType)
+        val existing = settings.clonedVoices
+        val voice = ClonedVoice(
+            id = "cv_${(existing.maxOfOrNull { it.createdAt } ?: 0L) + 1L}",
+            name = name.trim().ifBlank { language.displayName },
+            language = language,
+            voiceId = voiceId,
+            enabled = true,
+            // A monotonically increasing stamp so the most recently enrolled voice wins selection,
+            // without needing a wall clock in shared code (see ClonedVoices.enabledVoiceIdFor).
+            createdAt = (existing.maxOfOrNull { it.createdAt } ?: 0L) + 1L,
+        )
+        persistClonedVoices(existing + voice)
+        voice
+    }
+
+    /** Enables or disables the cloned voice with [id], persisting the change and updating state. */
+    fun setClonedVoiceEnabled(id: String, enabled: Boolean) {
+        persistClonedVoices(
+            settings.clonedVoices.map { if (it.id == id) it.copy(enabled = enabled) else it },
+        )
+    }
+
+    /** Deletes the cloned voice with [id], persisting the change and updating state. */
+    fun deleteClonedVoice(id: String) {
+        persistClonedVoices(settings.clonedVoices.filterNot { it.id == id })
+    }
+
+    private fun persistClonedVoices(voices: List<ClonedVoice>) {
+        settings.clonedVoices = voices
+        _clonedVoices.value = voices
     }
 
     /**
@@ -183,6 +243,23 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun guide(id: Long): StudyGuide? = sessions.firstOrNull { it.id == id }?.guide
+
+    /**
+     * Marks the play round for structure [structureIndex] of session [id] as completed at least
+     * once, persisting it so that play screen becomes skippable on later visits. The updated
+     * session list is republished on [uiState] so open screens see the change immediately.
+     */
+    fun markStructurePlayed(id: Long, structureIndex: Int) {
+        val session = sessions.firstOrNull { it.id == id } ?: return
+        if (structureIndex in session.playedStructures) return
+        val updated = session.playedStructures + structureIndex
+        // Update the in-memory snapshot immediately so the UI unlocks skipping without waiting.
+        sessions = sessions.map { if (it.id == id) it.copy(playedStructures = updated) else it }
+        _uiState.update { it.copy(history = sessions) }
+        viewModelScope.launch {
+            studyStore.savePlayedStructures(id, updated)
+        }
+    }
 
     /**
      * Loads the missions for session [id], generating them from its study guide the first time and

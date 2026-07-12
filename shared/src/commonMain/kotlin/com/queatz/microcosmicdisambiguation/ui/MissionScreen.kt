@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -24,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -54,6 +56,7 @@ import com.queatz.microcosmicdisambiguation.data.MissionReply
 import com.queatz.microcosmicdisambiguation.data.MissionTurn
 import com.queatz.microcosmicdisambiguation.resources.Res
 import com.queatz.microcosmicdisambiguation.resources.back
+import com.queatz.microcosmicdisambiguation.resources.close
 import com.queatz.microcosmicdisambiguation.resources.finish
 import com.queatz.microcosmicdisambiguation.resources.mission_build_failed
 import com.queatz.microcosmicdisambiguation.resources.mission_building
@@ -360,6 +363,7 @@ private fun MissionRunner(
             mission = mission,
             missionNumber = missionIndex + 1,
             missionCount = missions.size,
+            onClose = onClose,
         )
 
         Column(
@@ -400,14 +404,28 @@ private fun MissionHeader(
     mission: Mission,
     missionNumber: Int,
     missionCount: Int,
+    onClose: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(Res.string.mission_header, missionNumber, missionCount, title),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(Res.string.mission_header, missionNumber, missionCount, title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(Res.string.close),
+                )
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             val icon = mission.icon
             if (icon.isNotBlank()) {
