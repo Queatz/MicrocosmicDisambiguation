@@ -2,6 +2,7 @@ package com.queatz.microcosmicdisambiguation.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.queatz.microcosmicdisambiguation.audio.SpeechRecognizer
 import com.queatz.microcosmicdisambiguation.audio.Wav
@@ -148,52 +150,72 @@ fun CloneVoiceDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            if (isRecording) {
-                                recognizer.stop()
-                            } else {
-                                message = ""
-                                if (phase == ClonePhase.Error) phase = ClonePhase.Idle
-                                micPermission.request(
-                                    onGranted = { recognizer.start() },
-                                    onDenied = {
-                                        message = permissionNeeded
-                                        phase = ClonePhase.Error
-                                    },
-                                )
-                            }
-                        },
-                        enabled = !enrolling && !succeeded,
-                    ) {
-                        Icon(
-                            imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                            contentDescription = null,
-                        )
-                        Text(
-                            text = if (isRecording) {
-                                stringResource(Res.string.clone_voice_stop)
-                            } else {
-                                stringResource(Res.string.clone_voice_record)
+                val onToggleRecording = {
+                    if (isRecording) {
+                        recognizer.stop()
+                    } else {
+                        message = ""
+                        if (phase == ClonePhase.Error) phase = ClonePhase.Idle
+                        micPermission.request(
+                            onGranted = { recognizer.start() },
+                            onDenied = {
+                                message = permissionNeeded
+                                phase = ClonePhase.Error
                             },
-                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
-                    OutlinedButton(
-                        shape = RoundedCornerShape(24.dp),
-                        onClick = {
-                            message = ""
-                            if (phase == ClonePhase.Error) phase = ClonePhase.Idle
-                            audioPicker.pick { picked -> sample = picked }
-                        },
-                        enabled = !enrolling && !succeeded && !isRecording,
-                    ) {
-                        Icon(imageVector = Icons.Default.Upload, contentDescription = null)
-                        Text(
-                            text = stringResource(Res.string.clone_voice_upload),
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
+                }
+                val onPickUpload = {
+                    message = ""
+                    if (phase == ClonePhase.Error) phase = ClonePhase.Idle
+                    audioPicker.pick { picked -> sample = picked }
+                }
+
+                // Below a narrow-phone width, the record and upload buttons no longer fit side by
+                // side without truncating their labels, so they stack vertically instead.
+                BoxWithConstraints {
+                    if (maxWidth < 360.dp) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CloneSampleButton(
+                                icon = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                                text = if (isRecording) {
+                                    stringResource(Res.string.clone_voice_stop)
+                                } else {
+                                    stringResource(Res.string.clone_voice_record)
+                                },
+                                enabled = !enrolling && !succeeded,
+                                onClick = onToggleRecording,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            CloneSampleButton(
+                                icon = Icons.Default.Upload,
+                                text = stringResource(Res.string.clone_voice_upload),
+                                enabled = !enrolling && !succeeded && !isRecording,
+                                onClick = onPickUpload,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CloneSampleButton(
+                                icon = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                                text = if (isRecording) {
+                                    stringResource(Res.string.clone_voice_stop)
+                                } else {
+                                    stringResource(Res.string.clone_voice_record)
+                                },
+                                enabled = !enrolling && !succeeded,
+                                onClick = onToggleRecording,
+                                modifier = Modifier.weight(1f),
+                            )
+                            CloneSampleButton(
+                                icon = Icons.Default.Upload,
+                                text = stringResource(Res.string.clone_voice_upload),
+                                enabled = !enrolling && !succeeded && !isRecording,
+                                onClick = onPickUpload,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                 }
 
@@ -273,6 +295,30 @@ fun CloneVoiceDialog(
             }
         },
     )
+}
+
+/**
+ * The record/upload sample buttons in [CloneVoiceDialog], factored out so they can be laid out
+ * either side by side ([Modifier.weight] in a [Row]) or stacked ([Modifier.fillMaxWidth] in a
+ * [Column]) depending on the available width, without duplicating their content.
+ */
+@Composable
+private fun CloneSampleButton(
+    icon: ImageVector,
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(24.dp),
+        enabled = enabled,
+        modifier = modifier,
+    ) {
+        Icon(imageVector = icon, contentDescription = null)
+        Text(text = text, modifier = Modifier.padding(start = 8.dp))
+    }
 }
 
 @Composable

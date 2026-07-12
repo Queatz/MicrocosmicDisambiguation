@@ -380,13 +380,19 @@ class WebSpeechRecognizer(
         deliverRecording()
     }
 
-    /** Hands the captured audio and final transcript to [onSessionComplete] exactly once. */
+    /**
+     * Hands the captured audio and final transcript to [onSessionComplete] exactly once. Only
+     * [audio] is required to be non-empty: the transcript is best-effort and may legitimately stay
+     * blank (e.g. a short voice-cloning sample with no recognizable words, or background noise), and
+     * callers that don't care about the transcript (such as the clone-a-voice dialog) shouldn't lose
+     * a perfectly good recording just because ASR produced nothing.
+     */
     private fun deliverRecording() {
         if (completed) return
         completed = true
         val audio = audioChunks.flattenBytes()
+        if (audio.isEmpty()) return
         val transcript = finalizedText.ifBlank { partialText }
-        if (audio.isEmpty() || transcript.isBlank()) return
         onSessionComplete?.invoke(audio, transcript)
     }
 

@@ -115,7 +115,7 @@ private enum class PlayPhase {
 
 /** The state of the audio-input frame while the learner speaks a coin's word. */
 private enum class SpeakState {
-    /** The app is reading the word aloud; recognition has not started yet (round 2). */
+    /** The app is reading the word aloud; recognition has not started yet. */
     Speaking,
 
     /** The mic is live and listening for the learner's attempt. */
@@ -204,8 +204,8 @@ fun PlayScreen(
     var speakState by remember(structure) { mutableStateOf(SpeakState.Listening) }
     var transcript by remember(structure) { mutableStateOf("") }
     var errorMessage by remember(structure) { mutableStateOf<String?>(null) }
-    // Bumped every time a coin is tapped in round 2 so a word we finish reading only starts the mic
-    // if the learner hasn't already moved on to another coin.
+    // Bumped every time a coin is tapped so a word we finish reading only starts the mic if the
+    // learner hasn't already moved on to another coin.
     var speakGeneration by remember(structure) { mutableStateOf(0L) }
 
     // The recognizer callbacks are installed once but must see the latest target coin.
@@ -304,58 +304,40 @@ fun PlayScreen(
         if (isCorrect(index)) return
         activeIndex = index
 
-        if (phase == PlayPhase.Meanings) {
-            // Round 2: first read the word aloud so the learner hears the correct pronunciation,
-            // and only then start listening — with a strong "recording" cue — so the mic doesn't
-            // pick up the app's own voice and the learner knows exactly when to repeat it.
-            val generation = ++speakGeneration
-            if (recognizer.isListening) recognizer.stop()
-            transcript = ""
-            errorMessage = null
-            speakState = SpeakState.Speaking
-            micPermission.request(
-                onGranted = {
-                    val word = words.getOrNull(index)
-                    if (word != null) {
-                        // Speak the word first; only once the learner has heard it do we start
-                        // listening for their attempt (from the onDone callback below).
-                        speaker.speak(
-                            word.hanzi,
-                            onDone = {
-                                // Skip if the learner has since moved on to another coin.
-                                if (speakGeneration == generation && currentActive.value == index) {
-                                    beginListening()
-                                }
-                            },
-                        )
-                    } else {
-                        // No word to read aloud (shouldn't normally happen); just listen.
-                        beginListening()
-                    }
-                },
-                onDenied = {
-                    errorMessage = permissionNeededMessage
-                    speakState = SpeakState.Error
-                },
-            )
-            return
-        }
-
-        // Round 1: play the word and start listening at the same time.
-        words.getOrNull(index)?.let { speaker.speak(it.hanzi) }
-        if (recognizer.isListening) {
-            // Seamlessly retarget the open session; the live matcher follows [currentActive].
-            transcript = ""
-            speakState = SpeakState.Listening
-        } else {
-            micPermission.request(
-                onGranted = { beginListening() },
-                onDenied = {
-                    errorMessage = permissionNeededMessage
-                    speakState = SpeakState.Error
-                },
-            )
-        }
+        // Always read the word aloud first so the learner hears it, and only *then* start
+        // listening — with the pulsing "recording" cue — so the mic doesn't pick up the app's own
+        // voice, and the pulse itself signals "now it's your turn", not "get ready".
+        val generation = ++speakGeneration
+        if (recognizer.isListening) recognizer.stop()
+        transcript = ""
+        errorMessage = null
+        speakState = SpeakState.Speaking
+        micPermission.request(
+            onGranted = {
+                val word = words.getOrNull(index)
+                if (word != null) {
+                    // Speak the word first; only once the learner has heard it do we start
+                    // listening for their attempt (from the onDone callback below), which is what
+                    // flips speakState to Listening and turns on the pulse.
+                    speaker.speak(
+                        word.hanzi,
+                        onDone = {
+                            // Skip if the learner has since moved on to another coin.
+                            if (speakGeneration == generation && currentActive.value == index) {
+                                beginListening()
+                            }
+                        },
+                    )
+                } else {
+                    // No word to read aloud (shouldn't normally happen); just listen.
+                    beginListening()
+                }
+            },
+            onDenied = {
+                errorMessage = permissionNeededMessage
+                speakState = SpeakState.Error
+            },
+        )
     }
 
     fun tapCoin(index: Int) {
@@ -807,7 +789,7 @@ private fun SpeakFrame(
             }
 
             when (state) {
-                // Round 2: the app is reading the word aloud; recognition hasn't started yet.
+                // The app is reading the word aloud; recognition hasn't started yet.
                 SpeakState.Speaking -> {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
