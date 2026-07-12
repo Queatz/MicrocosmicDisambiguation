@@ -316,9 +316,9 @@ fun PlayScreen(
             micPermission.request(
                 onGranted = {
                     val word = words.getOrNull(index)
-                    if (word == null) {
-                        beginListening()
-                    } else {
+                    if (word != null) {
+                        // Speak the word first; only once the learner has heard it do we start
+                        // listening for their attempt (from the onDone callback below).
                         speaker.speak(
                             word.hanzi,
                             onDone = {
@@ -328,6 +328,9 @@ fun PlayScreen(
                                 }
                             },
                         )
+                    } else {
+                        // No word to read aloud (shouldn't normally happen); just listen.
+                        beginListening()
                     }
                 },
                 onDenied = {

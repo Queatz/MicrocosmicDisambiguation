@@ -140,6 +140,7 @@ fun CloneVoiceDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
+                    shape = RoundedCornerShape(24.dp),
                     label = { Text(stringResource(Res.string.clone_voice_name)) },
                     placeholder = { Text(stringResource(Res.string.clone_voice_name_placeholder)) },
                     singleLine = true,

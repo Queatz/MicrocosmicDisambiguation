@@ -1,5 +1,13 @@
 package com.queatz.microcosmicdisambiguation.ai
 
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.HOST
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.QWEN_API_KEY
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.REALTIME_ASR_MODEL
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.REALTIME_ENDPOINT
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.TTS_DEFAULT_VOICE_ID
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.TTS_ENDPOINT
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.TTS_MODEL
+import com.queatz.microcosmicdisambiguation.ai.QwenService.Companion.TTS_VOICE_DESIGN_ENDPOINT
 import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.LanguagePair
 import com.queatz.microcosmicdisambiguation.data.Mission
@@ -14,12 +22,11 @@ import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
-import io.ktor.client.request.headers
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.websocket.Frame
@@ -53,6 +60,14 @@ class QwenService(
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        // CosyVoice's WebSocket protocol validates the run-task/continue-task/finish-task messages
+        // strictly and rejects them if fields with (non-null) default values, such as
+        // RunTaskPayload.taskGroup ("task_group"), are missing entirely — but kotlinx.serialization
+        // omits any property left at its default value unless explicitly told to encode it. Without
+        // this, DashScope replies "Missing required parameter 'payload.task_group'!" (and would fail
+        // the same way for every other defaulted field below it, e.g. TtsParameters.format/
+        // sampleRate) even though the Kotlin code always sets a value.
+        encodeDefaults = true
     }
 
     private var inMemoryVoiceId: String? = null
@@ -89,9 +104,7 @@ class QwenService(
         )
 
         val response: ChatResponse = client.post(ENDPOINT) {
-            headers {
-                append(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
+            bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
@@ -119,9 +132,7 @@ class QwenService(
         )
 
         val response: ChatResponse = client.post(ENDPOINT) {
-            headers {
-                append(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
+            bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
@@ -164,9 +175,7 @@ class QwenService(
         )
 
         val response: ChatResponse = client.post(ENDPOINT) {
-            headers {
-                append(HttpHeaders.Authorization, "Bearer $apiKey")
-            }
+            bearerAuth(apiKey)
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
@@ -222,9 +231,7 @@ class QwenService(
 
         try {
             client.webSocket(TTS_ENDPOINT, request = {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $apiKey")
-                }
+                bearerAuth(apiKey)
             }) {
                 send(Frame.Text(json.encodeToString(RunTaskMessage.serializer(), runTask)))
                 for (frame in incoming) {
@@ -343,9 +350,7 @@ class QwenService(
         )
         val response: CreateVoiceResponse = try {
             client.post(TTS_VOICE_DESIGN_ENDPOINT) {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $apiKey")
-                }
+                bearerAuth(apiKey)
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }.body()
