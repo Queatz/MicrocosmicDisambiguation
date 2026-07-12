@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.queatz.microcosmicdisambiguation.LocalAppContainer
+import com.queatz.microcosmicdisambiguation.audio.SpeechRecognizer
 import com.queatz.microcosmicdisambiguation.audio.TtsEngine
 import com.queatz.microcosmicdisambiguation.data.Language
 import com.queatz.microcosmicdisambiguation.data.SentenceStructure
@@ -185,11 +186,7 @@ fun PlayScreen(
     val noSpeechMessage = stringResource(Res.string.play_no_speech)
     val permissionNeededMessage = stringResource(Res.string.play_permission_needed)
 
-    // A recognizer biased toward the language being studied, so it hears the learner's attempt at
-    // the coin's word rather than the language they already know.
-    val recognizer = remember(language) {
-        audioFactory.createSpeechRecognizer(languageHints = listOf(language.asrCode))
-    }
+    var activeRecognizer by remember(structure) { mutableStateOf<SpeechRecognizer?>(null) }
 
     var phase by remember(structure) { mutableStateOf(PlayPhase.Intro) }
     // Coins flipped for a 2-second peek during the intro (index -> flip generation counter).
@@ -208,11 +205,6 @@ fun PlayScreen(
     // learner hasn't already moved on to another coin.
     var speakGeneration by remember(structure) { mutableStateOf(0L) }
 
-    // The recognizer callbacks are installed once but must see the latest target coin.
-    val currentActive = rememberUpdatedState(activeIndex)
-    val currentWords = rememberUpdatedState(words)
-    val currentLanguage = rememberUpdatedState(language)
-
     // Whether this coin's word has already been judged correct in the current phase.
     fun isCorrect(index: Int): Boolean = when (phase) {
         PlayPhase.Meanings -> recalled[index] == true
@@ -229,55 +221,23 @@ fun PlayScreen(
         words.getOrNull(index)?.let { speaker.speak(it.hanzi) }
     }
 
-    DisposableEffect(recognizer) {
-        recognizer.onListeningChanged = { listening ->
-            if (listening) {
-                speakState = SpeakState.Listening
-            } else if (speakState == SpeakState.Listening) {
-                // The mic stopped; wait for the final transcription to arrive.
-                speakState = SpeakState.Checking
-            }
-        }
-        recognizer.onTextChanged = { live ->
-            transcript = live
-            val index = currentActive.value
-            if (index != null && !isCorrect(index)) {
-                val target = currentWords.value.getOrNull(index)
-                // The instant the live transcript contains the whole word, it counts — stop listening.
-                if (target != null &&
-                    isWordSpoken(target.hanzi, live, currentLanguage.value.characterSegmented)
-                ) {
-                    markCorrect(index)
-                    activeIndex = null
-                    recognizer.stop()
-                }
-            }
-        }
-        recognizer.onError = { message ->
-            errorMessage = message
-            speakState = SpeakState.Error
-        }
-        recognizer.onSessionComplete = { _, finalTranscript ->
-            transcript = finalTranscript
-            val index = currentActive.value
-            if (index != null && !isCorrect(index)) {
-                val target = currentWords.value.getOrNull(index)
-                if (target != null &&
-                    isWordSpoken(target.hanzi, finalTranscript, currentLanguage.value.characterSegmented)
-                ) {
-                    markCorrect(index)
-                    activeIndex = null
-                } else {
-                    speakState = SpeakState.TryAgain
-                }
-            }
-        }
+    DisposableEffect(activeRecognizer) {
+        val recognizer = activeRecognizer
         onDispose {
-            recognizer.onListeningChanged = null
-            recognizer.onTextChanged = null
-            recognizer.onError = null
-            recognizer.onSessionComplete = null
-            recognizer.shutdown()
+            recognizer?.apply {
+                onListeningChanged = null
+                onTextChanged = null
+                onError = null
+                onSessionComplete = null
+                shutdown()
+            }
+        }
+    }
+
+    LaunchedEffect(activeIndex) {
+        if (activeIndex == null) {
+            activeRecognizer?.shutdown()
+            activeRecognizer = null
         }
     }
 
@@ -287,16 +247,64 @@ fun PlayScreen(
         if (speakState == SpeakState.Checking && activeIndex != null) {
             delay(6_000)
             if (speakState == SpeakState.Checking) {
+                activeRecognizer?.shutdown()
+                activeRecognizer = null
                 errorMessage = noSpeechMessage
                 speakState = SpeakState.Error
             }
         }
     }
 
-    fun beginListening() {
-        transcript = ""
-        errorMessage = null
-        speakState = SpeakState.Listening
+    fun startListeningForCoin(index: Int, generation: Long) {
+        val recognizer = audioFactory.createSpeechRecognizer(languageHints = listOf(language.asrCode))
+
+        recognizer.onListeningChanged = { listening ->
+            if (speakGeneration == generation && activeIndex == index) {
+                if (listening) {
+                    speakState = SpeakState.Listening
+                } else if (speakState == SpeakState.Listening) {
+                    speakState = SpeakState.Checking
+                }
+            }
+        }
+        recognizer.onTextChanged = { live ->
+            if (speakGeneration == generation && activeIndex == index) {
+                transcript = live
+                if (!isCorrect(index)) {
+                    val target = words.getOrNull(index)
+                    if (target != null &&
+                        isWordSpoken(target.hanzi, live, language.characterSegmented)
+                    ) {
+                        markCorrect(index)
+                        activeIndex = null
+                    }
+                }
+            }
+        }
+        recognizer.onError = { message ->
+            if (speakGeneration == generation && activeIndex == index) {
+                errorMessage = message
+                speakState = SpeakState.Error
+            }
+        }
+        recognizer.onSessionComplete = { _, finalTranscript ->
+            if (speakGeneration == generation && activeIndex == index) {
+                transcript = finalTranscript
+                if (!isCorrect(index)) {
+                    val target = words.getOrNull(index)
+                    if (target != null &&
+                        isWordSpoken(target.hanzi, finalTranscript, language.characterSegmented)
+                    ) {
+                        markCorrect(index)
+                        activeIndex = null
+                    } else {
+                        speakState = SpeakState.TryAgain
+                    }
+                }
+            }
+        }
+
+        activeRecognizer = recognizer
         recognizer.start()
     }
 
@@ -308,7 +316,8 @@ fun PlayScreen(
         // listening — with the pulsing "recording" cue — so the mic doesn't pick up the app's own
         // voice, and the pulse itself signals "now it's your turn", not "get ready".
         val generation = ++speakGeneration
-        if (recognizer.isListening) recognizer.stop()
+        activeRecognizer?.shutdown()
+        activeRecognizer = null
         transcript = ""
         errorMessage = null
         speakState = SpeakState.Speaking
@@ -323,14 +332,16 @@ fun PlayScreen(
                         word.hanzi,
                         onDone = {
                             // Skip if the learner has since moved on to another coin.
-                            if (speakGeneration == generation && currentActive.value == index) {
-                                beginListening()
+                            if (speakGeneration == generation && activeIndex == index) {
+                                startListeningForCoin(index, generation)
                             }
                         },
                     )
                 } else {
                     // No word to read aloud (shouldn't normally happen); just listen.
-                    beginListening()
+                    if (speakGeneration == generation && activeIndex == index) {
+                        startListeningForCoin(index, generation)
+                    }
                 }
             },
             onDenied = {
@@ -366,7 +377,8 @@ fun PlayScreen(
     LaunchedEffect(allSpoken) {
         if (allSpoken && phase == PlayPhase.Playing) {
             activeIndex = null
-            if (recognizer.isListening) recognizer.stop()
+            activeRecognizer?.shutdown()
+            activeRecognizer = null
             delay(900)
             phase = PlayPhase.Meanings
         }
@@ -377,7 +389,8 @@ fun PlayScreen(
     LaunchedEffect(allRecalled) {
         if (allRecalled && phase == PlayPhase.Meanings) {
             activeIndex = null
-            if (recognizer.isListening) recognizer.stop()
+            activeRecognizer?.shutdown()
+            activeRecognizer = null
             phase = PlayPhase.Done
             onCompleted()
         }

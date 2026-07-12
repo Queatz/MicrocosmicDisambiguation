@@ -461,11 +461,16 @@ class QwenService(
         private const val MODEL = "qwen-plus"
 
         /**
+         * The task-based WebSocket endpoint used for CosyVoice TTS and FunASR realtime speech recognition.
+         */
+        const val INFERENCE_ENDPOINT = "wss://$HOST/api-ws/v1/inference"
+
+        /**
          * CosyVoice's real-time speech synthesis WebSocket endpoint. Unlike the old Qwen3-TTS
          * `multimodal-generation` HTTP endpoint, this has no CORS preflight to fail, which is what
          * fixes the 401 seen from the browser build (see [synthesizeSpeech]).
          */
-        private const val TTS_ENDPOINT = "wss://$HOST/api-ws/v1/inference"
+        private const val TTS_ENDPOINT = INFERENCE_ENDPOINT
 
         /**
          * The CosyVoice model used for cloud speech synthesis over [TTS_ENDPOINT]. As with

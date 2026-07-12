@@ -255,7 +255,10 @@ class WebSpeechRecognizer(
     /** The mic-capture handle (stream/context/nodes) returned by [jsStartMic] while listening. */
     private var micHandle: JsAny? = null
 
-    /** Transcripts the server has already finalized (via `...completed`), joined together. */
+    /** The id of the task currently running, needed to address the matching `finish-task`. */
+    private var currentTaskId: String? = null
+
+    /** Transcripts the server has already finalized, joined together. */
     private var finalizedText = ""
 
     /** The in-progress transcript the server is still refining. */
@@ -263,6 +266,9 @@ class WebSpeechRecognizer(
 
     /** The raw 16 kHz mono 16-bit PCM frames captured during the session, in order. */
     private val audioChunks = mutableListOf<ByteArray>()
+
+    /** Temporary buffer to stage raw PCM bytes and send larger chunks over WebSocket. */
+    private val sendBuffer = WebSendBuffer()
 
     /** Guards against delivering [onSessionComplete] more than once per session. */
     private var completed = false
@@ -286,16 +292,22 @@ class WebSpeechRecognizer(
         completed = false
         shuttingDown = false
         audioChunks.clear()
+        sendBuffer.takeAll() // Reset the send buffer for a new session
         // The session is accepted the moment start() is called, mirroring Android; if the socket or
         // the microphone fails to come up, fail() flips this back and reports the error.
         listening = true
         onListeningChanged?.invoke(true)
 
+        val taskId = eventId()
+        currentTaskId = taskId
+
         val opened = runCatching {
             jsOpenAsrSocket(
-                url = "${QwenService.REALTIME_ENDPOINT}?model=${QwenService.REALTIME_ASR_MODEL}",
+                url = QwenService.INFERENCE_ENDPOINT,
                 apiKey = apiKey,
-                onOpen = { jsSendText(socket, sessionUpdateMessage()) },
+                onOpen = {
+                    jsSendText(socket, runTaskMessage(taskId))
+                },
                 onMessage = { text -> handleEvent(text.toString()) },
                 onClose = { finishLocally() },
                 onError = { fail("Speech recognition failed") },
@@ -312,8 +324,15 @@ class WebSpeechRecognizer(
     override fun stop() {
         if (!listening) return
         stopMicCapture()
-        jsSendText(socket, simpleMessage("input_audio_buffer.commit"))
-        jsSendText(socket, simpleMessage("session.finish"))
+        
+        val remainder = sendBuffer.takeAll()
+        if (remainder.isNotEmpty()) {
+            jsSendBinary(socket, remainder.toBase64())
+        }
+
+        currentTaskId?.let { taskId ->
+            jsSendText(socket, finishTaskMessage(taskId))
+        }
         // The session is over from the user's perspective the moment they tap stop; the final
         // transcript (and onSessionComplete) still arrive once the server closes the socket.
         listening = false
@@ -322,27 +341,30 @@ class WebSpeechRecognizer(
 
     private fun handleEvent(message: String) {
         val event = runCatching {
-            json.decodeFromString(RealtimeAsrEvent.serializer(), message)
+            json.decodeFromString(AsrEvent.serializer(), message)
         }.getOrNull() ?: return
 
-        when (event.type) {
-            "session.created" -> startMicCapture()
-            "conversation.item.input_audio_transcription.text" -> {
-                // `text` is the confirmed transcript so far; `stash` is the tentative tail.
-                partialText = event.text.orEmpty() + event.stash.orEmpty()
+        when (event.header?.event) {
+            "task-started" -> {
+                startMicCapture()
+            }
+            "result-generated" -> {
+                val sentence = event.payload?.output?.sentence ?: return
+                val text = sentence.text.orEmpty()
+                if (sentence.sentenceEnd) {
+                    finalizedText += text
+                    partialText = ""
+                } else {
+                    partialText = text
+                }
                 onTextChanged?.invoke(finalizedText + partialText)
             }
-            "conversation.item.input_audio_transcription.completed" -> {
-                finalizedText += event.transcript.orEmpty()
-                partialText = ""
-                onTextChanged?.invoke(finalizedText)
-            }
-            "session.finished" -> {
+            "task-finished" -> {
                 jsCloseSocket(socket)
                 finishLocally()
             }
-            "error" -> {
-                val reason = event.error?.message ?: "Speech recognition failed"
+            "task-failed", "error" -> {
+                val reason = event.header.errorMessage ?: "Speech recognition failed"
                 jsCloseSocket(socket)
                 fail(reason)
             }
@@ -359,8 +381,13 @@ class WebSpeechRecognizer(
 
     private fun onAudioChunk(base64: String) {
         if (!listening) return
-        audioChunks.add(base64.fromBase64())
-        jsSendText(socket, appendAudioMessage(base64))
+        val data = base64.fromBase64()
+        audioChunks.add(data)
+        sendBuffer.append(data)
+        while (sendBuffer.size >= CHUNK_BYTES) {
+            val chunk = sendBuffer.take(CHUNK_BYTES)
+            jsSendBinary(socket, chunk.toBase64())
+        }
     }
 
     private fun stopMicCapture() {
@@ -420,28 +447,34 @@ class WebSpeechRecognizer(
         socket = null
     }
 
-    private fun sessionUpdateMessage(): String {
-        // The model accepts a single optional language hint; pick the first code it can recognize.
+    private fun runTaskMessage(taskId: String): String {
         val language = languageHints.firstOrNull { it in SUPPORTED_LANGUAGES }
-        val message = AsrSessionUpdateEvent(
-            eventId = eventId(),
-            session = AsrSessionConfig(
-                inputAudioTranscription = AsrTranscriptionConfig(language = language),
-                // null turn detection selects manual mode, where we control commit/finish.
-                turnDetection = null,
+        val hints = language?.let { listOf(it) }
+
+        val message = AsrRequest(
+            header = AsrRequestHeader(action = "run-task", taskId = taskId, streaming = "duplex"),
+            payload = AsrRequestPayload(
+                taskGroup = "audio",
+                task = "asr",
+                function = "recognition",
+                model = QwenService.REALTIME_ASR_MODEL,
+                parameters = AsrParameters(
+                    format = "pcm",
+                    sampleRate = 16_000,
+                    languageHints = hints,
+                ),
+                input = AsrInput(),
             ),
         )
-        return json.encodeToString(AsrSessionUpdateEvent.serializer(), message)
+        return json.encodeToString(AsrRequest.serializer(), message)
     }
 
-    private fun appendAudioMessage(base64Audio: String): String {
-        val message = AsrAppendAudioEvent(eventId = eventId(), audio = base64Audio)
-        return json.encodeToString(AsrAppendAudioEvent.serializer(), message)
-    }
-
-    private fun simpleMessage(type: String): String {
-        val message = AsrSimpleEvent(type = type, eventId = eventId())
-        return json.encodeToString(AsrSimpleEvent.serializer(), message)
+    private fun finishTaskMessage(taskId: String): String {
+        val message = AsrRequest(
+            header = AsrRequestHeader(action = "finish-task", taskId = taskId, streaming = "duplex"),
+            payload = AsrRequestPayload(input = AsrInput()),
+        )
+        return json.encodeToString(AsrRequest.serializer(), message)
     }
 
     private fun eventId(): String {
@@ -452,6 +485,8 @@ class WebSpeechRecognizer(
     }
 
     private companion object {
+        private const val CHUNK_BYTES = 12_800
+
         /**
          * The `language` codes the [QwenService.REALTIME_ASR_MODEL] can bias toward; others fall
          * back to auto-detection.
@@ -472,58 +507,64 @@ class WebSpeechRecognizer(
 }
 
 @Serializable
-private data class AsrSessionUpdateEvent(
-    @SerialName("event_id") val eventId: String,
-    val session: AsrSessionConfig,
-    val type: String = "session.update",
+private data class AsrRequest(
+    val header: AsrRequestHeader,
+    val payload: AsrRequestPayload,
 )
 
 @Serializable
-private data class AsrSessionConfig(
-    @SerialName("input_audio_transcription") val inputAudioTranscription: AsrTranscriptionConfig,
-    @SerialName("turn_detection") val turnDetection: AsrTurnDetection? = null,
-    val modalities: List<String> = listOf("text"),
-    @SerialName("input_audio_format") val inputAudioFormat: String = "pcm",
-    @SerialName("sample_rate") val sampleRate: Int = 16_000,
+private data class AsrRequestHeader(
+    val action: String,
+    @SerialName("task_id") val taskId: String? = null,
+    val streaming: String,
 )
 
 @Serializable
-private data class AsrTranscriptionConfig(
-    val language: String? = null,
-)
-
-/** Placeholder for server-VAD configuration; unused while we run in manual (commit/finish) mode. */
-@Serializable
-private data class AsrTurnDetection(
-    val type: String = "server_vad",
-)
-
-@Serializable
-private data class AsrAppendAudioEvent(
-    @SerialName("event_id") val eventId: String,
-    val audio: String,
-    val type: String = "input_audio_buffer.append",
+private data class AsrRequestPayload(
+    @SerialName("task_group") val taskGroup: String? = null,
+    val task: String? = null,
+    val function: String? = null,
+    val model: String? = null,
+    val parameters: AsrParameters? = null,
+    val input: AsrInput? = null,
 )
 
 @Serializable
-private data class AsrSimpleEvent(
-    @SerialName("event_id") val eventId: String,
-    val type: String,
+private data class AsrParameters(
+    val format: String,
+    @SerialName("sample_rate") val sampleRate: Int,
+    @SerialName("language_hints") val languageHints: List<String>? = null,
 )
 
 @Serializable
-private data class RealtimeAsrEvent(
-    val type: String? = null,
+private class AsrInput
+
+@Serializable
+private data class AsrEvent(
+    val header: AsrEventHeader? = null,
+    val payload: AsrEventPayload? = null,
+)
+
+@Serializable
+private data class AsrEventHeader(
+    val event: String? = null,
+    @SerialName("error_message") val errorMessage: String? = null,
+)
+
+@Serializable
+private data class AsrEventPayload(
+    val output: AsrEventOutput? = null,
+)
+
+@Serializable
+private data class AsrEventOutput(
+    val sentence: AsrSentence? = null,
+)
+
+@Serializable
+private data class AsrSentence(
     val text: String? = null,
-    val stash: String? = null,
-    val transcript: String? = null,
-    val error: RealtimeAsrError? = null,
-)
-
-@Serializable
-private data class RealtimeAsrError(
-    val message: String? = null,
-    val code: String? = null,
+    @SerialName("sentence_end") val sentenceEnd: Boolean = false,
 )
 
 /** An [AudioClipPlayer] backed by an HTML `Audio` element playing `data:`/blob URLs. */
@@ -599,7 +640,8 @@ private fun jsOpenAsrSocket(
 ): JsAny? = js(
     """(function() {
         try {
-            var authedUrl = url + '&api_key=' + encodeURIComponent(apiKey);
+            var separator = url.indexOf('?') !== -1 ? '&' : '?';
+            var authedUrl = url + separator + 'api_key=' + encodeURIComponent(apiKey);
             var ws = new WebSocket(authedUrl);
             ws.onopen = function() { onOpen(); };
             ws.onmessage = function(e) { onMessage(String(e.data)); };
@@ -615,6 +657,25 @@ private fun jsOpenAsrSocket(
 /** Sends [text] over [socket], swallowing any failure (e.g. an already-closed socket). */
 private fun jsSendText(socket: JsAny?, text: String) {
     js("(function(){ if (socket) { try { socket.send(text); } catch (e) {} } })()")
+}
+
+/** Sends base64 encoded binary data as raw binary frame over [socket], swallowing any failure. */
+private fun jsSendBinary(socket: JsAny?, base64: String) {
+    js(
+        """(function(){
+            if (socket) {
+                try {
+                    var binary = atob(base64);
+                    var len = binary.length;
+                    var bytes = new Uint8Array(len);
+                    for (var i = 0; i < len; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    socket.send(bytes.buffer);
+                } catch (e) {}
+            }
+        })()"""
+    )
 }
 
 /** Closes [socket], swallowing any failure. */
@@ -761,4 +822,29 @@ private fun List<ByteArray>.flattenBytes(): ByteArray {
         offset += chunk.size
     }
     return result
+}
+
+private class WebSendBuffer {
+    private var buffer = ByteArray(0)
+
+    fun append(data: ByteArray) {
+        val newBuffer = ByteArray(buffer.size + data.size)
+        buffer.copyInto(newBuffer, 0, 0, buffer.size)
+        data.copyInto(newBuffer, buffer.size, 0, data.size)
+        buffer = newBuffer
+    }
+
+    val size: Int get() = buffer.size
+
+    fun take(length: Int): ByteArray {
+        val chunk = buffer.copyOfRange(0, length)
+        buffer = buffer.copyOfRange(length, buffer.size)
+        return chunk
+    }
+
+    fun takeAll(): ByteArray {
+        val all = buffer
+        buffer = ByteArray(0)
+        return all
+    }
 }
