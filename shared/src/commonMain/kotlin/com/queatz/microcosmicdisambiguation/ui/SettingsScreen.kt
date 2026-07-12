@@ -222,6 +222,7 @@ private fun RecordingsEntry(onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -275,6 +276,7 @@ private fun TtsModeOption(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
             .selectable(selected = selected, onClick = onSelect),
     ) {
         Row(
