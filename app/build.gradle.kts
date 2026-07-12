@@ -37,22 +37,55 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // Compose Multiplatform resource packaging workaround (AGP 9 + com.android.kotlin.multiplatform.library).
+    // That new KMP Android-library plugin does not yet copy the shared module's Compose resources
+    // into the consuming app, so at runtime the generated `Res` accessors can't find the strings
+    // (the Android resource reader looks them up via the classloader / Java resources). We copy the
+    // prepared resources into a generated Java-resources dir under the generated Res package path so
+    // they are packaged into the APK.
+    sourceSets.getByName("main").resources
+        .srcDir(layout.buildDirectory.dir("generated/composeResourcesJavaRes").get().asFile)
+}
+
+val copyComposeResourcesToJavaRes by tasks.registering(Copy::class) {
+    dependsOn(":shared:prepareComposeResourcesTaskForCommonMain")
+    from(
+        project(":shared").layout.buildDirectory.dir(
+            "generated/compose/resourceGenerator/preparedResources/commonMain/composeResources",
+        ),
+    )
+    // The runtime looks resources up under `composeResources/<Res package>/…`, so insert that
+    // package directory (matching `packageOfResClass` in the shared module) here.
+    into(
+        layout.buildDirectory.dir(
+            "generated/composeResourcesJavaRes/composeResources/com.queatz.microcosmicdisambiguation.resources",
+        ),
+    )
+}
+
+// Ensure the resources are copied before the Java-resources source set is consumed (both the
+// per-variant `process*JavaRes` and the packaging `merge*JavaResource` tasks), for debug and release.
+tasks.matching {
+    it.name.matches(Regex("(process|merge).*JavaRes(ource)?"))
+}.configureEach {
+    dependsOn(copyComposeResourcesToJavaRes)
 }
 
 dependencies {
+    // The whole Compose Multiplatform UI (screens, theme, navigation, view model) lives in the
+    // shared module and is reused verbatim here — this is the same UI the web target renders.
+    implementation(project(":shared"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // Only needed to host the shared UI: `setContent` + edge-to-edge in MainActivity. The Compose
+    // runtime/material/foundation artifacts are pulled in transitively from :shared (Compose
+    // Multiplatform), so the app doesn't declare its own Compose BOM anymore.
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigation.compose)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
-    implementation(libs.androidx.compose.material.icons.extended)
 
+    // The Android speech recognizer streams microphone audio over an OkHttp WebSocket, and the
+    // Qwen client uses Ktor's OkHttp engine.
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
@@ -66,8 +99,4 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

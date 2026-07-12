@@ -13,27 +13,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The state of the [Speaker]'s underlying [TextToSpeech] engine with respect to speaking the
- * target language it was configured for.
- */
-enum class SpeakerStatus {
-    /** The engine has not finished initializing yet. */
-    Initializing,
-
-    /** The engine is ready and the target language voice data is installed. */
-    Ready,
-
-    /** The engine supports the target language, but the voice data needs to be downloaded. */
-    MissingData,
-
-    /** The selected engine does not support the target language at all. */
-    NotSupported,
-
-    /** The engine failed to initialize. */
-    Failed,
-}
-
-/**
  * A thin wrapper around Android [TextToSpeech] configured for the given [language].
  *
  * Use [speak] to read text aloud and call [shutdown] when the owner is destroyed.

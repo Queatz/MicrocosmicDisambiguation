@@ -1,0 +1,118 @@
+<resources>
+    <string name="app_name">Microcosmic Disambiguation</string>
+
+    <!-- Common -->
+    <string name="back">戻る</string>
+    <string name="cancel">キャンセル</string>
+    <string name="delete">削除</string>
+    <string name="close">閉じる</string>
+    <string name="next">次へ</string>
+    <string name="stop">停止</string>
+    <string name="finish">完了</string>
+    <string name="settings">設定</string>
+    <string name="recordings">録音</string>
+    <string name="try_again">もう一度試す</string>
+
+    <!-- Home screen -->
+    <string name="home_whats_going_on">どうしましたか？</string>
+    <string name="home_describe_situation">実際の状況を説明して学習しましょう。</string>
+    <string name="home_irl_situation_placeholder">実際の状況</string>
+    <string name="home_voice_input">音声入力</string>
+    <string name="home_stop_voice_input">音声入力を停止</string>
+    <string name="home_generating">生成中…</string>
+    <string name="home_study_this">これを学習する</string>
+    <string name="home_learning">勉強しています</string>
+    <string name="home_change_language">言語を変更</string>
+    <string name="home_previous_sessions">これまでの学習</string>
+    <string name="home_no_sessions">まだ学習がありません。上のボックスに実際の状況を入力すると学習を始められます — 学習履歴はここに表示されます。</string>
+    <string name="home_delete_session_title">学習を削除しますか？</string>
+    <string name="home_delete_session_message">\"%1$s\" を完全に削除します。</string>
+
+    <!-- Settings screen -->
+    <string name="settings_your_language">あなたの言語</string>
+    <string name="settings_i_speak">話せる言語</string>
+    <string name="settings_tts_engine">テキスト読み上げエンジン</string>
+    <string name="settings_tts_ai_title">AI（Qwen）</string>
+    <string name="settings_tts_ai_description">自然なネイティブの声。インターネット接続が必要です。</string>
+    <string name="settings_tts_system_title">システム</string>
+    <string name="settings_tts_system_description">端末内蔵のテキスト読み上げエンジンを使用します。オフラインで動作します。</string>
+    <string name="settings_review_recordings">録音を確認</string>
+    <string name="settings_review_recordings_description">保存した音声録音とその文字起こしを聞けます。</string>
+
+    <!-- Recordings screen -->
+    <string name="recordings_empty">まだ録音がありません。実際の状況を話すと録音が作成されます。</string>
+    <string name="recordings_delete_title">録音を削除しますか？</string>
+    <string name="recordings_delete_message">音声とその文字起こしを完全に削除します。</string>
+    <string name="recordings_play">録音を再生</string>
+    <string name="recordings_no_transcription">（文字起こしなし）</string>
+    <string name="recordings_subtitle">%1$s · %2$s秒</string>
+
+    <!-- Study screen -->
+    <string name="study_no_content">学習できる内容がありません。</string>
+    <string name="study_try_mission">実際のミッションに挑戦</string>
+    <string name="study_missions">ミッション</string>
+    <string name="study_words">単語</string>
+    <string name="study_breakdown">解説</string>
+    <string name="study_play_sentence">文を再生</string>
+    <string name="study_word_by_word">単語ごとに再生</string>
+    <string name="study_next_word">次の単語</string>
+
+    <string name="study_pronounce">発音を練習</string>
+    <string name="study_pronounce_word">「%1$s」の発音を練習</string>
+    <string name="study_pronounce_title">発音練習</string>
+    <string name="study_pronounce_start">録音を開始</string>
+    <string name="study_pronounce_stop">録音を停止</string>
+    <string name="study_pronounce_listening">聞いています…話してください。</string>
+    <string name="study_pronounce_processing">発音を確認しています…</string>
+    <string name="study_pronounce_you_said">あなたの発話</string>
+    <string name="study_pronounce_nothing_heard">（何も聞こえませんでした）</string>
+    <string name="study_pronounce_accuracy">正確さ：%1$d%%</string>
+    <string name="study_pronounce_play_comparison">比較を再生</string>
+    <string name="study_pronounce_retry">もう一度</string>
+    <string name="study_pronounce_no_speech">聞き取れませんでした。もう少し大きな声で録音し直してください。</string>
+    <string name="study_pronounce_permission_needed">発音練習にはマイクの権限が必要です。</string>
+
+    <!-- Mission screen -->
+    <string name="mission_building">ミッションを作成中…</string>
+    <string name="mission_building_subtitle">学んだことで切り抜けられる実際の状況です。</string>
+    <string name="mission_build_failed">ミッションを作成できませんでした</string>
+    <string name="mission_none_available">利用できるミッションがありません。</string>
+    <string name="mission_header">ミッション %1$d / %2$d · %3$s</string>
+    <string name="mission_talking_to">%1$s と話しています。</string>
+    <string name="mission_default_success">いいですね — うまくいきました！相手に伝わり、会話が進みます。</string>
+    <string name="mission_pick_what_to_say">何を言うか選んでください。</string>
+    <string name="mission_next">次のミッション</string>
+    <string name="mission_continue">続ける</string>
+
+    <!-- Mission open-ended reply -->
+    <string name="mission_reply_prompt_default">何と言いますか？</string>
+    <string name="mission_reply_hint">「話す」を押して声に出して言ってください。</string>
+    <string name="mission_reply_speak">話す</string>
+    <string name="mission_reply_stop">録音を停止</string>
+    <string name="mission_reply_recording">録音中… 今話してください。</string>
+    <string name="mission_reply_processing">あなたの返事を聞いています…</string>
+    <string name="mission_reply_your_reply">あなたの返事</string>
+    <string name="mission_reply_translation">翻訳</string>
+    <string name="mission_reply_npc_response">相手の反応</string>
+    <string name="mission_reply_listen_npc">相手の返事を聞く</string>
+    <string name="mission_reply_say_back">返事</string>
+    <string name="mission_reply_retry">返事をやり直す</string>
+    <string name="mission_reply_continue">ミッションを続ける</string>
+    <string name="mission_reply_nothing_heard">（何も聞こえませんでした）</string>
+    <string name="mission_reply_no_speech">うまく聞き取れませんでした。「話す」を押して、もう少し大きな声でもう一度お試しください。</string>
+    <string name="mission_reply_permission_needed">返事を話すにはマイクの許可が必要です。</string>
+    <string name="mission_reply_failed">返事を処理できませんでした。もう一度お試しください。</string>
+
+    <!-- Text-to-speech availability dialog -->
+    <string name="tts_voice_unavailable_title">%1$s の音声は利用できません</string>
+    <string name="tts_missing_data_message">文を読み上げるには、%1$s の音声データをダウンロードする必要があります。</string>
+    <string name="tts_not_supported_message">お使いのテキスト読み上げエンジンは %1$s に対応していません。設定を開いてインストールするか、対応するエンジンに切り替えてください。</string>
+    <string name="tts_download">ダウンロード</string>
+    <string name="tts_open_settings">設定を開く</string>
+    <string name="tts_not_now">今はしない</string>
+
+    <!-- Errors -->
+    <string name="error_generate_study_guide">学習ガイドの生成に失敗しました</string>
+    <string name="error_generate_missions">ミッションの生成に失敗しました</string>
+    <string name="error_session_not_found">学習が見つかりません</string>
+</resources>

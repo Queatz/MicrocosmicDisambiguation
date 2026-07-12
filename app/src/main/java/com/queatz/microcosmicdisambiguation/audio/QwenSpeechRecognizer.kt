@@ -43,7 +43,7 @@ class QwenSpeechRecognizer(
     private val apiKey: String = QwenService.QWEN_API_KEY,
     /** Language codes biasing recognition toward the languages the learner dictates in. */
     private val languageHints: List<String> = emptyList(),
-) {
+) : SpeechRecognizer {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -71,17 +71,17 @@ class QwenSpeechRecognizer(
     /** Guards against delivering [onSessionComplete] more than once per session. */
     private val completed = AtomicBoolean(false)
 
-    var onTextChanged: ((String) -> Unit)? = null
-    var onListeningChanged: ((Boolean) -> Unit)? = null
-    var onError: ((String) -> Unit)? = null
+    override var onTextChanged: ((String) -> Unit)? = null
+    override var onListeningChanged: ((Boolean) -> Unit)? = null
+    override var onError: ((String) -> Unit)? = null
 
     /**
      * Invoked once a session ends normally, delivering the raw 16 kHz mono 16-bit PCM audio that was
      * captured along with the final transcript. Not called if the session fails or is shut down.
      */
-    var onSessionComplete: ((audio: ByteArray, transcript: String) -> Unit)? = null
+    override var onSessionComplete: ((audio: ByteArray, transcript: String) -> Unit)? = null
 
-    val isListening: Boolean
+    override val isListening: Boolean
         get() = listening.get()
 
     /**
@@ -89,7 +89,7 @@ class QwenSpeechRecognizer(
      * delivered incrementally via [onTextChanged]. Has no effect if already listening.
      */
     @SuppressLint("MissingPermission")
-    fun start() {
+    override fun start() {
         if (!listening.compareAndSet(false, true)) return
 
         finalizedText = ""
@@ -128,7 +128,7 @@ class QwenSpeechRecognizer(
      * Signals the server that audio is complete and ends the session. The microphone is released
      * immediately; the final transcript may arrive shortly after via [onTextChanged].
      */
-    fun stop() {
+    override fun stop() {
         if (!listening.get()) return
         stopRecording()
         webSocket?.let {
@@ -266,7 +266,7 @@ class QwenSpeechRecognizer(
     }
 
     /** Releases all resources. Call when the recognizer is no longer needed. */
-    fun shutdown() {
+    override fun shutdown() {
         stopRecording()
         // Tearing down the recognizer isn't a normal session end, so suppress delivery.
         completed.set(true)
